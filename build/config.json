@@ -1,0 +1,66 @@
+{
+  "contest": {
+    "name": "InterMountain Group · HVAC AOR Contest · Jul 1 – Aug 31, 2026",
+    "startDate": "2026-07-01",
+    "endDate": "2026-08-31",
+    "totalDays": 62,
+    "hyperionGoal": 750000,
+    "gmBudget": 48,
+    "weeks": [
+      { "num": 1, "start": "2026-07-01", "end": "2026-07-12", "label": "Week 1 · Jul 1–12" },
+      { "num": 2, "start": "2026-07-13", "end": "2026-07-19", "label": "Week 2 · Jul 13–19" },
+      { "num": 3, "start": "2026-07-20", "end": "2026-07-26", "label": "Week 3 · Jul 20–26" },
+      { "num": 4, "start": "2026-07-27", "end": "2026-08-02", "label": "Week 4 · Jul 27–Aug 2" },
+      { "num": 5, "start": "2026-08-03", "end": "2026-08-09", "label": "Week 5 · Aug 3–9" },
+      { "num": 6, "start": "2026-08-10", "end": "2026-08-16", "label": "Week 6 · Aug 10–16" },
+      { "num": 7, "start": "2026-08-17", "end": "2026-08-23", "label": "Week 7 · Aug 17–23" },
+      { "num": 8, "start": "2026-08-24", "end": "2026-08-31", "label": "Week 8 · Aug 24–31" }
+    ]
+  },
+  "teams": {
+    "cardinal":            { "name": "Cardinal",                    "division": "Major League", "tenants": ["cardinal"] },
+    "crisafulli-albany":   { "name": "Crisafulli Bros. – Albany",   "division": "Major League", "tenants": ["crisafulli_bros"], "buFilter": "Albany" },
+    "deans":               { "name": "Dean's",                      "division": "Major League", "tenants": ["deansprofessional"] },
+    "keefes":              { "name": "Keefe's",                     "division": "Major League", "tenants": ["keefesairconditioningheating"] },
+    "riteway":             { "name": "Rite Way",                    "division": "Major League", "tenants": ["ritewayventilationco"] },
+    "sierra":              { "name": "Sierra",                      "division": "Major League", "tenants": ["sierraairconditioning"], "ours": true, "color": "#1F4E79" },
+
+    "apollo":              { "name": "Apollo",                      "division": "AAA", "tenants": ["apolloheatingandcooling"] },
+    "arlinghaus":          { "name": "Arlinghaus",                  "division": "AAA", "tenants": ["arlinghaus"] },
+    "brothers":            { "name": "Brothers",                    "division": "AAA", "tenants": ["brothersplumbingheating"], "ours": true, "color": "#3A6B35" },
+    "environmentmasters":  { "name": "Environment Masters",         "division": "AAA", "tenants": ["environmentmasters"] },
+    "guaranteed":          { "name": "Guaranteed Service",          "division": "AAA", "tenants": ["guaranteedservice"] },
+    "hope":                { "name": "Hope Plumbing",               "division": "AAA", "tenants": ["hopeplumbing"] },
+    "johncflood":          { "name": "John C. Flood",               "division": "AAA", "tenants": ["johncflood"] },
+    "allbritten":          { "name": "Allbritten",                  "division": "AAA", "tenants": ["abccoolingheatingdbaallbrittenthebarefootplumber"] },
+    "signature":           { "name": "Signature",                   "division": "AAA", "tenants": ["signatureheatingcoolingplumbing"] },
+    "hendrick":            { "name": "Hendrick",                    "division": "AAA", "tenants": ["hendrickheatair"] },
+
+    "bj":                  { "name": "B&J",                         "division": "AA / A", "tenants": ["bjplumbingheatingandair"] },
+    "bestcare":            { "name": "Best Care",                   "division": "AA / A", "tenants": ["bestcarehomeservicesllc", "bestcareofnalabamallc"] },
+    "parks":               { "name": "Parks",                       "division": "AA / A", "tenants": ["parkshvac"] },
+    "crisafulli-glens":    { "name": "Crisafulli Bros. – Glens Falls", "division": "AA / A", "tenants": ["crisafulli_bros"], "buFilter": "Glens Falls" },
+    "russett":             { "name": "Russett",                     "division": "AA / A", "tenants": ["russettsouthwest"], "ours": true, "color": "#7B2D43" },
+    "ultimate":            { "name": "Ultimate",                    "division": "AA / A", "tenants": ["ultimateheatingandair"], "ours": true, "color": "#B3541E" }
+  },
+  "nonContestTenants": ["tonyyplumbingserviceinc", "redwoodservices"],
+  "matchups": {
+    "1": [
+      ["cardinal", "crisafulli-albany"],
+      ["riteway", "deans"],
+      ["keefes", "sierra"],
+      ["signature", "hope"],
+      ["brothers", "environmentmasters"],
+      ["arlinghaus", "johncflood"],
+      ["hendrick", "guaranteed"],
+      ["allbritten", "apollo"],
+      ["parks", "crisafulli-glens"],
+      ["russett", "bj"],
+      ["bestcare", "ultimate"]
+    ]
+  },
+  "rosterOverrides": {
+    "_comment": "Official CA roster size per team key. If absent, CA count is estimated from reps active in the reports.",
+    "sierra": null, "ultimate": null, "brothers": null, "russett": null
+  }
+}

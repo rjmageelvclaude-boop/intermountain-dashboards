@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hyperion Club — Live Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#17293D; --cream:#F5F1E8; --card:#FFF; --border:#E3DCCB; --track:#F0EBDD;
+    --muted:#6B7A8C; --faint:#9FB0C3; --faint2:#8A97A6; --steel:#44566B;
+    --red:#C8321E; --gold:#E0A421; --green:#2E7D4F; --amber:#9A6E14; --offpace:#B8C2CE; --ourrow:#FCF6E3;
+  }
+  html,body{margin:0;padding:0;background:var(--cream);}
+  *{box-sizing:border-box;}
+  body{font-family:'Barlow',sans-serif;color:var(--navy);padding-bottom:64px;}
+  .cond{font-family:'Barlow Condensed',sans-serif;}
+  .wrap{max-width:1200px;margin:0 auto;padding:0 24px;}
+  .num{font-variant-numeric:tabular-nums;}
+  a{color:inherit;}
+
+  header{background:var(--navy);color:var(--cream);padding:20px 0 0;}
+  .hrow{display:flex;flex-wrap:wrap;align-items:center;gap:16px;justify-content:space-between;}
+  .brand{font-family:'Barlow Condensed';font-weight:700;font-size:34px;letter-spacing:2px;color:var(--gold);}
+  .sub{font-size:14px;color:var(--faint);font-weight:500;}
+  .chip{font-family:'Barlow Condensed';font-weight:700;font-size:15px;letter-spacing:1px;padding:4px 12px;border-radius:4px;}
+  .meta{font-size:13px;color:var(--faint);}
+  .tabs{display:flex;gap:4px;flex-wrap:wrap;margin-top:16px;}
+  .tab{cursor:pointer;font-family:'Barlow Condensed';font-weight:600;font-size:18px;letter-spacing:1px;
+       padding:10px 20px;border-radius:6px 6px 0 0;background:rgba(255,255,255,.06);color:var(--faint);
+       border-bottom:3px solid transparent;user-select:none;}
+  .tab.active{background:var(--cream);color:var(--navy);}
+
+  main section{margin-top:32px;}
+  h2.sec{font-family:'Barlow Condensed';font-weight:600;font-size:20px;letter-spacing:1.5px;color:var(--muted);
+     margin:0 0 10px;text-transform:uppercase;}
+  .secrow{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
+  .secrow h2{margin:0;}
+  .hint{font-size:12px;color:var(--muted);}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:10px;}
+  .foot{padding:10px 18px;font-size:12px;color:var(--muted);border-top:1px solid var(--track);}
+
+  /* stakes */
+  .stakes{background:var(--navy);border-radius:12px;padding:18px 22px;}
+  .stakes h3{font-family:'Barlow Condensed';font-weight:700;font-size:20px;letter-spacing:2px;color:var(--gold);margin:0 0 12px;}
+  .stakegrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;}
+  .stake{border-left:3px solid var(--gold);padding-left:12px;}
+  .stake b{font-family:'Barlow Condensed';font-weight:700;font-size:18px;color:var(--cream);display:block;}
+  .stake span{font-size:12.5px;color:var(--faint);line-height:1.5;}
+
+  /* KPIs */
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;}
+  .kpi{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;}
+  .kpi .l{font-size:12px;font-weight:600;letter-spacing:1px;color:var(--muted);text-transform:uppercase;}
+  .kpi .v{font-family:'Barlow Condensed';font-weight:700;font-size:36px;margin-top:2px;}
+  .kpi .s{font-size:12px;color:var(--muted);margin-top:2px;}
+
+  /* battle cards */
+  .battles{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;}
+  .battle{cursor:pointer;background:var(--card);border:1px solid var(--border);border-top:5px solid var(--co);border-radius:12px;padding:18px 20px;transition:box-shadow .15s;}
+  .battle:hover{box-shadow:0 4px 16px rgba(23,41,61,.14);}
+  .brow{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .bteam{font-family:'Barlow Condensed';font-weight:700;font-size:28px;line-height:1;}
+  .brev{font-family:'Barlow Condensed';font-weight:700;font-size:38px;line-height:1.1;}
+  .bvs{font-family:'Barlow Condensed';font-weight:600;font-size:14px;color:var(--faint);letter-spacing:1px;}
+  .bopp{font-family:'Barlow Condensed';font-weight:600;font-size:18px;color:var(--steel);line-height:1;text-align:right;}
+  .bopprev{font-family:'Barlow Condensed';font-weight:700;font-size:38px;color:var(--faint2);line-height:1.1;text-align:right;}
+  .bfoot{display:flex;justify-content:space-between;align-items:center;margin-top:14px;border-top:1px solid var(--track);padding-top:10px;gap:8px;flex-wrap:wrap;}
+  .pill{color:#fff;font-family:'Barlow Condensed';font-weight:700;font-size:15px;letter-spacing:.5px;padding:3px 12px;border-radius:20px;white-space:nowrap;}
+  .bmeta{font-size:12.5px;font-weight:600;color:var(--muted);}
+
+  /* tables */
+  .thead,.trow{display:grid;gap:10px;align-items:center;padding:9px 18px;}
+  .thead{font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--muted);padding:10px 18px 4px;}
+  .trow{border-top:1px solid var(--track);font-size:13.5px;}
+  .trow.ours{background:var(--ourrow);}
+  .trow.pod{background:#FDFAF2;}
+  .rank{font-family:'Barlow Condensed';font-weight:700;font-size:19px;color:var(--faint);}
+  .rank.top{color:var(--red);}
+  .tname{font-weight:600;font-size:14px;}
+  .tco{font-size:12px;font-weight:600;color:var(--muted);}
+  .badge{background:var(--gold);color:var(--navy);font-size:10px;font-weight:700;letter-spacing:.5px;padding:1px 7px;border-radius:10px;margin-left:6px;vertical-align:1px;}
+  .r{text-align:right;}
+  .c{text-align:center;}
+  .sortable{cursor:pointer;user-select:none;}
+  .sortable.on{color:var(--navy);}
+  .barwrap{height:6px;background:var(--track);border-radius:4px;margin-top:6px;overflow:hidden;}
+  .bar{height:100%;border-radius:4px;}
+  .pace{font-size:12px;font-weight:700;}
+  .good{color:var(--green);} .bad{color:var(--red);} .mut{color:var(--muted);}
+
+  /* divisions */
+  .divgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;align-items:start;}
+  .divcard{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+  .divhead{background:var(--navy);color:var(--cream);font-family:'Barlow Condensed';font-weight:700;font-size:20px;letter-spacing:1px;padding:8px 16px;}
+  .dhead,.drow{display:grid;grid-template-columns:26px 1fr 30px 30px 42px 70px;gap:4px;align-items:center;padding:7px 12px;font-size:13px;}
+  .dhead{font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--muted);padding:8px 12px 4px;}
+  .drow{border-top:1px solid var(--track);}
+  .drow.ours{background:var(--ourrow);font-weight:700;}
+  .games{padding:10px 12px;border-top:2px solid var(--border);display:flex;flex-direction:column;gap:6px;font-size:13px;}
+
+  /* scoring */
+  .scoregrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;}
+  .score{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+  .score b{font-family:'Barlow Condensed';font-weight:700;font-size:19px;}
+  .score i{color:var(--faint);font-style:normal;}
+  .score p{font-size:13px;color:var(--steel);margin:6px 0 0;line-height:1.5;}
+
+  /* hero (company page) */
+  .hero{background:var(--navy);border-radius:12px;padding:24px 28px;}
+  .herorow{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px;}
+  .hname{font-family:'Barlow Condensed';font-weight:700;font-size:44px;color:var(--cream);line-height:1;}
+  .hrev{font-family:'Barlow Condensed';font-weight:700;font-size:56px;color:var(--gold);line-height:1.1;}
+  .hlab{font-size:12px;font-weight:600;color:var(--faint);letter-spacing:1px;}
+  .hopp{font-family:'Barlow Condensed';font-weight:700;font-size:34px;color:#B8C2CE;line-height:1;}
+  .hopprev{font-family:'Barlow Condensed';font-weight:700;font-size:56px;color:var(--faint2);line-height:1.1;}
+
+  /* bonus meter */
+  .meter{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px 24px;}
+  .meterhead{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;}
+  .meterhead b{font-family:'Barlow Condensed';font-weight:700;font-size:22px;}
+  .mtrack{position:relative;height:64px;margin-top:18px;}
+  .mbar{position:absolute;left:0;right:0;top:24px;height:14px;background:var(--track);border-radius:8px;overflow:hidden;}
+  .mfill{height:100%;border-radius:8px;}
+  .mtick{position:absolute;top:20px;width:2px;height:22px;background:#C9BFA8;}
+  .mticklab{position:absolute;top:2px;transform:translateX(-50%);font-size:11px;font-weight:700;color:var(--muted);white-space:nowrap;}
+  .mproj{position:absolute;top:16px;width:3px;height:30px;background:var(--red);border-radius:2px;}
+  .mprojlab{position:absolute;top:50px;transform:translateX(-50%);font-size:10.5px;font-weight:700;color:var(--red);white-space:nowrap;}
+  .meterfoot{display:flex;justify-content:space-between;margin-top:8px;font-size:12.5px;color:var(--muted);flex-wrap:wrap;gap:6px;}
+
+  /* controls */
+  .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .btn{cursor:pointer;border:1px solid var(--border);background:var(--card);color:var(--muted);
+       font-family:'Barlow Condensed';font-weight:600;font-size:14px;letter-spacing:.5px;padding:6px 14px;border-radius:6px;user-select:none;}
+  .btn.on{background:var(--navy);color:var(--cream);border-color:var(--navy);}
+  input.search{border:1px solid var(--border);border-radius:6px;padding:7px 12px;font-family:'Barlow';font-size:13px;min-width:170px;}
+  .cutline{display:flex;align-items:center;gap:10px;padding:6px 18px;}
+  .cutline div:first-child,.cutline div:last-child{flex:1;border-top:2px dashed var(--red);}
+  .cutline span{font-size:11px;font-weight:700;letter-spacing:1px;color:var(--red);}
+
+  .note{font-size:12px;color:var(--muted);margin-top:8px;}
+  @media(max-width:700px){
+    .hidesm{display:none !important;}
+    .hrev,.hopprev{font-size:40px;}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="hrow">
+      <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;">
+        <div class="brand">HYPERION CLUB</div>
+        <div class="sub">InterMountain Group · HVAC AOR Contest · Jul 1 – Aug 31, 2026</div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <div class="chip" style="background:var(--red);color:#fff;" id="weekChip"></div>
+        <div class="chip" style="background:rgba(255,255,255,.08);color:var(--gold);" id="daysChip"></div>
+        <div class="meta" id="metaLine"></div>
+      </div>
+    </div>
+    <div class="tabs" id="tabs"></div>
+  </div>
+</header>
+<main class="wrap" id="main"></main>
+
+<script src="./hyperion-data.js"></script>
+<script>
+(function(){
+  var D = window.HYPERION_DATA;
+  var GOAL = D.contest.hyperionGoal, DAYS = D.contest.totalDays || 62;
+  var PACE = GOAL * D.dayNum / DAYS;
+
+  var money = function(n){ return '$' + Math.round(n).toLocaleString('en-US'); };
+  var moneyK = function(n){ return n>=1e6 ? '$'+(n/1e6).toFixed(2)+'M' : '$'+Math.round(n/1000)+'K'; };
+  var moneyK1 = function(n){ return '$'+(n/1000).toFixed(1)+'K'; };
+  var esc = function(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); };
+
+  var teams = Object.values(D.teams);
+  var ourTeams = teams.filter(function(t){ return t.ours; });
+  var OUR_TAB_ORDER = ['sierra','ultimate','brothers','russett'];
+
+  // ---------- shared derivations ----------
+  function sortStand(list){
+    return list.slice().sort(function(a,b){ return (b.points-a.points) || (b.revPerCaWeek-a.revPerCaWeek); });
+  }
+  function divTeams(div){ return teams.filter(function(t){ return t.division===div; }); }
+  function rankIn(div, key){
+    return sortStand(divTeams(div)).findIndex(function(t){ return t.key===key; }) + 1;
+  }
+  function ord(n){ var s=['th','st','nd','rd'],v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); }
+  function oppOf(key){
+    for (var i=0;i<D.matchups.length;i++){
+      var m=D.matchups[i];
+      if(m[0]===key) return D.teams[m[1]];
+      if(m[1]===key) return D.teams[m[0]];
+    }
+    return null;
+  }
+  function statusPill(us,them){
+    var lead = us>=them;
+    return '<span class="pill" style="background:'+(lead?'var(--green)':'var(--red)')+'">'+
+      (lead?'LEADING +':'TRAILING −')+moneyK1(Math.abs(us-them))+'</span>';
+  }
+  function paceCell(rev){
+    var on = rev>=PACE;
+    return '<span class="pace '+(on?'good':'bad')+'">'+(on?'+':'−')+moneyK1(Math.abs(rev-PACE))+' vs pace</span>';
+  }
+  function progressBar(rev,ours){
+    var w=Math.max(1,Math.min(100,rev/GOAL*100));
+    return '<div class="barwrap"><div class="bar" style="width:'+w+'%;background:'+(rev>=PACE?'var(--gold)':'var(--offpace)')+'"></div></div>';
+  }
+  function kpi(l,v,s,color){
+    return '<div class="kpi"><div class="l">'+l+'</div><div class="v"'+(color?' style="color:'+color+'"':'')+'>'+v+'</div>'+(s?'<div class="s">'+s+'</div>':'')+'</div>';
+  }
+
+  // ---------- header ----------
+  document.getElementById('weekChip').textContent = D.week.label.toUpperCase();
+  document.getElementById('daysChip').textContent = D.daysLeftWeek + ' DAYS LEFT THIS WEEK';
+  document.getElementById('metaLine').textContent = D.phase+' · Day '+D.dayNum+' of '+DAYS+' · data thru '+D.asOf+' · updated '+D.generatedAt;
+
+  var TABS = [{k:'overview',l:'OVERVIEW'},{k:'reps',l:'COMFORT ADVISORS'}]
+    .concat(OUR_TAB_ORDER.map(function(k){ return {k:k, l:D.teams[k].name.toUpperCase()}; }))
+    .concat([{k:'exceptions',l:'EXCEPTIONS'}]);
+
+  var state = { page:'overview', sort:'installed', scope:'all', q:'', exTeam:'all' };
+
+  function renderTabs(){
+    document.getElementById('tabs').innerHTML = TABS.map(function(t){
+      var active = state.page===t.k;
+      var border = active ? (D.teams[t.k] ? D.teams[t.k].color : 'var(--gold)') : 'transparent';
+      return '<div class="tab'+(active?' active':'')+'" data-page="'+t.k+'" style="border-bottom-color:'+border+'">'+t.l+'</div>';
+    }).join('');
+  }
+
+  // ---------- OVERVIEW ----------
+  function viewOverview(){
+    var h='';
+    // stakes
+    h+='<section><div class="stakes"><h3>WHAT\'S AT STAKE</h3><div class="stakegrid">'+
+      '<div class="stake"><b>HYPERION CLUB · $750K</b><span>Black jacket with your company logo + trophy. Repeat winners get recognized status.</span></div>'+
+      '<div class="stake"><b>TOP 10 IN THE NATION</b><span>European trip, Disney cruise, World Series & more. $900K minimum to qualify.</span></div>'+
+      '<div class="stake"><b>DIVISION CHAMPION</b><span>Team sales party + trophy. Sales Manager earns a $1,500 bonus.</span></div>'+
+      '<div class="stake"><b>THE MIGHTY HYPERION</b><span>Top team in the nation: huge team outing, champion trophy, Sales Manager $2,500 bonus.</span></div>'+
+    '</div></div></section>';
+
+    // group KPIs
+    var sum=function(f){ return ourTeams.reduce(function(a,t){ return a+f(t); },0); };
+    h+='<section><h2 class="sec">InterMountain · Installed AOR Revenue</h2><div class="kpis">'+
+      kpi('Today', moneyK(sum(function(t){return t.installed.today;})))+
+      kpi('This Week', moneyK(sum(function(t){return t.installed.wtd;})))+
+      kpi('Contest to Date', moneyK(sum(function(t){return t.installed.contest;})))+
+      kpi('Total Sales (sold)', moneyK(sum(function(t){return t.sales.contest;})),'pipeline tracker','var(--muted)')+
+    '</div></section>';
+
+    // battles
+    h+='<section><h2 class="sec">This Week\'s Battles · Rev per Comfort Advisor</h2><div class="battles">';
+    OUR_TAB_ORDER.forEach(function(k){
+      var t=D.teams[k], opp=oppOf(k);
+      var us=t.revPerCaWeek, them=opp?opp.revPerCaWeek:0;
+      h+='<div class="battle" data-page="'+k+'" style="--co:'+t.color+'">'+
+        '<div class="brow"><div><div class="bteam">'+esc(t.name)+'</div>'+
+        '<div class="brev" style="color:'+t.color+'">'+moneyK1(us)+'</div></div>'+
+        '<div class="bvs">VS</div>'+
+        '<div><div class="bopp">'+(opp?esc(opp.name).toUpperCase():'TBD')+'</div>'+
+        '<div class="bopprev">'+moneyK1(them)+'</div></div></div>'+
+        '<div class="bfoot">'+statusPill(us,them)+
+        '<span class="bmeta">'+esc(t.division)+' · '+ord(rankIn(t.division,k))+' of '+divTeams(t.division).length+' · '+t.points+' pts</span></div>'+
+      '</div>';
+    });
+    h+='</div></section>';
+
+    // big hitters
+    var all = sortStand(teams);
+    h+='<section><div class="secrow"><h2 class="sec">Big Hitters · National Team Points Race</h2>'+
+      '<span class="hint">Top team = The Mighty Hyperion · Top 3 win team outings</span></div><div class="card">'+
+      '<div class="thead" style="grid-template-columns:36px 1fr 100px 50px 46px 90px;"><div>#</div><div>TEAM</div><div class="hidesm">DIVISION</div><div class="c">W–L</div><div class="c">PTS</div><div class="r">REV/CA WK</div></div>';
+    all.forEach(function(t,i){
+      h+='<div class="trow'+(t.ours?' ours':(i<3?' pod':''))+'" style="grid-template-columns:36px 1fr 100px 50px 46px 90px;">'+
+        '<div class="rank'+(i<3?' top':'')+'">'+(i+1)+'</div>'+
+        '<div><span class="tname">'+esc(t.name)+'</span>'+(t.ours?'<span class="badge">OURS</span>':'')+'</div>'+
+        '<div class="tco hidesm">'+esc(t.division)+'</div>'+
+        '<div class="c num">'+t.wins+'–'+t.losses+'</div>'+
+        '<div class="c num" style="font-weight:700">'+t.points+'</div>'+
+        '<div class="r num">'+moneyK1(t.revPerCaWeek)+'</div></div>';
+    });
+    h+='<div class="foot">Ranked by contest points · until points accrue (first week closes Jul 12), ordered by this week\'s installed rev per CA · CA counts estimated from active reps in the reports</div></div></section>';
+
+    // division standings + matchups
+    h+='<section><h2 class="sec">Division Standings & '+esc(D.week.label.split('·')[0].trim())+' Matchups</h2><div class="divgrid">';
+    ['Major League','AAA','AA / A'].forEach(function(div){
+      h+='<div class="divcard"><div class="divhead">'+div.toUpperCase()+'</div>'+
+        '<div class="dhead"><div>#</div><div>TEAM</div><div class="c">W</div><div class="c">L</div><div class="c">PTS</div><div class="r">REV/CA</div></div>';
+      sortStand(divTeams(div)).forEach(function(t,i){
+        h+='<div class="drow'+(t.ours?' ours':'')+'"><div style="color:var(--red);font-weight:700">'+(i+1)+'</div>'+
+          '<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:4px">'+esc(t.name)+'</div>'+
+          '<div class="c num">'+t.wins+'</div><div class="c num">'+t.losses+'</div>'+
+          '<div class="c num" style="font-weight:700">'+t.points+'</div>'+
+          '<div class="r num">'+moneyK1(t.revPerCaWeek)+'</div></div>';
+      });
+      h+='<div class="games">';
+      D.matchups.forEach(function(m){
+        var a=D.teams[m[0]], b=D.teams[m[1]];
+        if(a.division!==div) return;
+        var f=function(t){ return '<span style="font-weight:'+(t.ours?700:500)+';color:'+(t.ours?'var(--red)':'var(--navy)')+'">'+esc(t.name)+'</span>'; };
+        h+='<div>'+f(a)+' <span style="font-size:11px;color:var(--faint);font-weight:600">vs</span> '+f(b)+'</div>';
+      });
+      h+='</div></div>';
+    });
+    h+='</div><div class="note">Win each week = highest installed AOR revenue per Comfort Advisor within your matchup. 1 pt/win weeks 1–5 · 2 pts/win weeks 6–8 · +2 GM bonus per month at ≥48% install GM.</div></section>';
+
+    // hyperion race
+    h+='<section><h2 class="sec">Hyperion Club Race · $750K Installed AOR Rev (Jul + Aug)</h2><div class="card">';
+    D.reps.slice(0,10).forEach(function(r,i){
+      h+='<div class="trow'+(r.ours?' ours':'')+'" style="grid-template-columns:32px 1fr 110px 110px;">'+
+        '<div class="rank">'+(i+1)+'</div>'+
+        '<div><span class="tname">'+esc(r.name)+'</span> <span class="tco" style="color:'+r.color+'">'+esc(r.company)+'</span>'+(r.ours?'<span class="badge">OURS</span>':'')+
+        progressBar(r.installed.contest,r.ours)+'</div>'+
+        '<div class="r num" style="font-weight:700">'+money(r.installed.contest)+'</div>'+
+        '<div class="r">'+paceCell(r.installed.contest)+'</div></div>';
+    });
+    h+='<div class="foot">Pace line today: '+money(PACE)+' · Full national list on the Comfort Advisors tab</div></div></section>';
+
+    // omitted data note + scoring
+    h+='<section><div class="note">SLC & Service Manager races (contests 5–8) will appear here once the leads-run and TGL reports are added to the pipeline.</div></section>';
+    h+='<section><h2 class="sec">How Points Work · Max 21</h2><div class="scoregrid">'+
+      '<div class="score"><b>Regular Season <i>· max 5</i></b><p>Weeks 1–5 round robin. Each weekly win = <b>1 pt</b>. Win = highest installed AOR rev per Comfort Advisor.</p></div>'+
+      '<div class="score"><b>Postseason <i>· max 6</i></b><p>Weeks 6–8, seeded by regular season. Each win = <b>2 pts</b>. Ties: head-to-head, then Aug GM.</p></div>'+
+      '<div class="score"><b>GM Bonus <i>· max 4</i></b><p><b>+2 pts</b> each for hitting Install Dept budgeted Gross Margin in July and in August (min 48%).</p></div>'+
+      '<div class="score"><b>Performance Bonus <i>· max 6</i></b><p>Jul+Aug Rev per CA: $400K <b>+2</b> · $500K <b>+3</b> · $600K <b>+4</b> · $700K <b>+5</b> · $800K <b>+6</b>.</p></div>'+
+    '</div></section>';
+    return h;
+  }
+
+  // ---------- COMFORT ADVISORS ----------
+  function viewReps(){
+    var rows = D.reps.slice();
+    if(state.scope==='ours') rows=rows.filter(function(r){return r.ours;});
+    if(state.q){ var q=state.q.toLowerCase();
+      rows=rows.filter(function(r){return r.name.toLowerCase().indexOf(q)>=0||r.company.toLowerCase().indexOf(q)>=0;});
+    }
+    var key = state.sort;   // 'installed' | 'sales'
+    rows.sort(function(a,b){ return b[key].contest - a[key].contest; });
+
+    // summary (always national installed-ranked)
+    var natl = D.reps.slice().sort(function(a,b){return b.installed.contest-a.installed.contest;});
+    var oursRanked = natl.map(function(r,i){return {r:r,rank:i+1};}).filter(function(x){return x.r.ours;});
+    var inTop10 = oursRanked.filter(function(x){return x.rank<=10;}).length;
+    var best = oursRanked[0];
+    var onPace = oursRanked.filter(function(x){return x.r.installed.contest>=PACE;}).length;
+    var cut = natl.length>=10 ? natl[9].installed.contest : 0;
+
+    var h='<section><div class="kpis">'+
+      kpi('Our CAs in Top 10', inTop10+' of 10','national leaderboard', inTop10>0?'var(--green)':'var(--red)')+
+      kpi('Our best rank', best?'#'+best.rank:'—', best?esc(best.r.name)+' · '+esc(best.r.company):'')+
+      kpi('Top 10 cut line', money(cut),'installed revenue of #10')+
+      kpi('Our CAs on Hyperion pace', onPace+' of '+oursRanked.length,'vs $750K pace line', onPace>=oursRanked.length/2?'var(--green)':'var(--red)')+
+    '</div></section>';
+
+    h+='<section><div class="secrow"><h2 class="sec">Redwood Nation · Comfort Advisor Leaderboard</h2>'+
+      '<div class="controls">'+
+      '<input class="search" id="repSearch" placeholder="Search advisor or company…" value="'+esc(state.q)+'">'+
+      '<span class="btn'+(state.scope==='all'?' on':'')+'" data-scope="all">National</span>'+
+      '<span class="btn'+(state.scope==='ours'?' on':'')+'" data-scope="ours">Our Companies</span>'+
+      '</div></div><div class="card">'+
+      '<div class="thead" style="grid-template-columns:38px 1fr 115px 110px 100px;">'+
+        '<div>#</div><div>COMFORT ADVISOR · PROGRESS TO $750K</div>'+
+        '<div class="r sortable'+(key==='installed'?' on':'')+'" data-sort="installed">TOTAL INSTALLED'+(key==='installed'?' ▾':'')+'</div>'+
+        '<div class="r sortable'+(key==='sales'?' on':'')+'" data-sort="sales">TOTAL SALES'+(key==='sales'?' ▾':'')+'</div>'+
+        '<div class="r hidesm">VS PACE</div></div>';
+    rows.forEach(function(r,i){
+      if(i===10 && state.scope==='all' && key==='installed' && !state.q)
+        h+='<div class="cutline"><div></div><span>TOP 10 CUT LINE</span><div></div></div>';
+      h+='<div class="trow'+(r.ours?' ours':'')+'" style="grid-template-columns:38px 1fr 115px 110px 100px;">'+
+        '<div class="rank'+(i<10?' top':'')+'">'+(i+1)+'</div>'+
+        '<div><span class="tname">'+esc(r.name)+'</span> <span class="tco" style="color:'+r.color+'">'+esc(r.company)+'</span>'+(r.ours?'<span class="badge">OURS</span>':'')+
+        progressBar(r.installed.contest,r.ours)+'</div>'+
+        '<div class="r num" style="font-weight:'+(key==='installed'?700:400)+'">'+money(r.installed.contest)+'</div>'+
+        '<div class="r num" style="font-weight:'+(key==='sales'?700:400)+';color:var(--muted)">'+money(r.sales.contest)+'</div>'+
+        '<div class="r hidesm">'+paceCell(r.installed.contest)+'</div></div>';
+    });
+    h+='<div class="foot">'+rows.length+' advisors · ranked by total '+key+' · installed is the contest measure; sales (sold estimates) shows the pipeline · pace line today '+money(PACE)+' · Top 10 win prizes, $900K minimum to qualify</div></div></section>';
+    return h;
+  }
+
+  // ---------- COMPANY PAGE ----------
+  function viewCompany(key){
+    var t=D.teams[key], opp=oppOf(key);
+    var us=t.revPerCaWeek, them=opp?opp.revPerCaWeek:0;
+    var h='';
+
+    h+='<section><div class="hero"><div class="herorow">'+
+      '<div><div class="hname">'+esc(t.name)+'</div><div class="hrev">'+moneyK1(us)+'</div>'+
+      '<div class="hlab">REV / COMFORT ADVISOR · THIS WEEK</div></div>'+
+      '<div style="text-align:center"><div class="bvs" style="font-size:18px;letter-spacing:2px">VS</div>'+
+      '<div style="margin-top:8px">'+statusPill(us,them)+'</div>'+
+      '<div class="meta" style="margin-top:8px">'+D.daysLeftWeek+' days left in WEEK '+D.week.num+'</div></div>'+
+      '<div style="text-align:right"><div class="hopp">'+(opp?esc(opp.name).toUpperCase():'TBD')+'</div>'+
+      '<div class="hopprev">'+moneyK1(them)+'</div>'+
+      '<div class="hlab">'+esc(t.division).toUpperCase()+' · '+ord(rankIn(t.division,key)).toUpperCase()+' OF '+divTeams(t.division).length+' · '+t.points+' PTS</div></div>'+
+    '</div></div></section>';
+
+    // bonus meter
+    var perCa = t.revPerCaContest;
+    var proj = perCa / D.dayNum * DAYS;
+    var tiers=[[400000,2],[500000,3],[600000,4],[700000,5],[800000,6]], MAX=850000;
+    var pts=function(v){ var p=0; tiers.forEach(function(x){ if(v>=x[0]) p=x[1]; }); return p; };
+    var nextTier = null; for(var i=0;i<tiers.length;i++){ if(proj<tiers[i][0]){ nextTier=tiers[i]; break; } }
+    h+='<section><div class="meter"><div class="meterhead"><b>PERFORMANCE BONUS METER · REV PER CA (JUL + AUG)</b>'+
+      '<span class="pace '+(pts(proj)>0?'good':'bad')+'">Projected finish: '+moneyK(proj)+'/CA → '+(pts(proj)>0?'+'+pts(proj)+' pts':'below $400K tier')+'</span></div>'+
+      '<div class="mtrack"><div class="mbar"><div class="mfill" style="width:'+Math.min(100,perCa/MAX*100)+'%;background:'+t.color+'"></div></div>';
+    tiers.forEach(function(x){
+      var l=(x[0]/MAX*100);
+      h+='<div class="mtick" style="left:'+l+'%"></div><div class="mticklab" style="left:'+l+'%">$'+(x[0]/1000)+'K · +'+x[1]+'</div>';
+    });
+    var pw=Math.min(98,proj/MAX*100);
+    h+='<div class="mproj" style="left:'+pw+'%"></div><div class="mprojlab" style="left:'+pw+'%">PROJECTED '+moneyK(proj)+'</div></div>'+
+      '<div class="meterfoot"><span>Current: <b style="color:var(--navy)">'+moneyK(perCa)+'</b> per CA (+'+pts(perCa)+' bonus pts locked) · '+t.caCount+' CAs</span>'+
+      '<span>'+(nextTier? moneyK(nextTier[0]-proj)+'/CA more (projected) to reach '+moneyK(nextTier[0])+' → +'+nextTier[1]+' pts' : 'Max tier projected — hold the pace!')+'</span></div>'+
+    '</div></section>';
+
+    // KPIs
+    h+='<section><h2 class="sec">Installed AOR Revenue</h2><div class="kpis">'+
+      kpi('Today', moneyK(t.installed.today))+
+      kpi('This Week', moneyK(t.installed.wtd))+
+      kpi('Contest to Date', moneyK(t.installed.contest))+
+      kpi('Total Sales (sold)', moneyK(t.sales.contest),'pipeline tracker','var(--muted)')+
+    '</div>'+(t.unattributed?'<div class="note">⚠ '+money(t.unattributed)+' of installed revenue has no Sold-By rep — see the Exceptions tab.</div>':'')+'</section>';
+
+    // CA table
+    var roster = D.reps.filter(function(r){ return r.teamKey===key; })
+                       .sort(function(a,b){ return b.installed.contest-a.installed.contest; });
+    h+='<section><h2 class="sec">Comfort Advisors · Hyperion Club Pace ($750K)</h2><div class="card">'+
+      '<div class="thead" style="grid-template-columns:30px 1fr 80px 90px 100px 100px 95px;">'+
+      '<div>#</div><div>NAME · PROGRESS TO $750K</div><div class="r hidesm">TODAY</div><div class="r hidesm">WEEK</div><div class="r">INSTALLED</div><div class="r">SALES</div><div class="r hidesm">PACE</div></div>';
+    roster.forEach(function(r,i){
+      h+='<div class="trow" style="grid-template-columns:30px 1fr 80px 90px 100px 100px 95px;">'+
+        '<div class="rank">'+(i+1)+'</div>'+
+        '<div><span class="tname">'+esc(r.name)+'</span>'+progressBar(r.installed.contest,true)+'</div>'+
+        '<div class="r num hidesm">'+money(r.installed.today)+'</div>'+
+        '<div class="r num hidesm">'+money(r.installed.wtd)+'</div>'+
+        '<div class="r num" style="font-weight:700">'+money(r.installed.contest)+'</div>'+
+        '<div class="r num" style="color:var(--muted)">'+money(r.sales.contest)+'</div>'+
+        '<div class="r hidesm">'+paceCell(r.installed.contest)+'</div></div>';
+    });
+    h+='<div class="foot">Pace line today: '+money(PACE)+' · Installed = completed job revenue credited to the selling CA · Sales = sold estimate value (pipeline)</div></div></section>';
+
+    h+='<section><div class="note">Key Player role cards (Call Center · SLC · Service · Install GM) will appear here once the opportunities, leads-run, TGL and job-costing reports are added to the pipeline.</div></section>';
+    return h;
+  }
+
+  // ---------- EXCEPTIONS ----------
+  function viewExceptions(){
+    var ex = D.exceptions;
+    var teamNames = {}; ex.forEach(function(e){ teamNames[e.team]=(teamNames[e.team]||0)+e.amount; });
+    var names = Object.keys(teamNames).sort(function(a,b){ return teamNames[b]-teamNames[a]; });
+    var rows = state.exTeam==='all' ? ex : ex.filter(function(e){ return e.team===state.exTeam; });
+    var total = rows.reduce(function(a,e){ return a+e.amount; },0);
+
+    var h='<section><div class="kpis">'+
+      kpi('Jobs missing Sold By', String(rows.length),'installed jobs with no sales rep','var(--red)')+
+      kpi('Unattributed revenue', money(total),'not credited to any CA','var(--red)')+
+      kpi('Teams affected', String(state.exTeam==='all'?names.length:1),'across the network')+
+      kpi('Data thru', D.asOf,'refreshed '+D.generatedAt)+
+    '</div></section>';
+
+    h+='<section><div class="secrow"><h2 class="sec">Exception Report · Installed Jobs With No Sold-By Rep</h2>'+
+      '<div class="controls"><select id="exTeam" class="search">'+
+      '<option value="all">All teams ('+ex.length+')</option>'+
+      names.map(function(n){ return '<option value="'+esc(n)+'"'+(state.exTeam===n?' selected':'')+'>'+esc(n)+' ('+moneyK(teamNames[n])+')</option>'; }).join('')+
+      '</select><span class="btn" id="exCsv">⬇ Download CSV</span></div></div>'+
+      '<div class="card"><div class="thead" style="grid-template-columns:1fr 90px 1fr 130px 90px 95px;">'+
+      '<div>TEAM</div><div>JOB #</div><div class="hidesm">CUSTOMER</div><div class="hidesm">BUSINESS UNIT</div><div class="r">AMOUNT</div><div class="r">COMPLETED</div></div>';
+    rows.forEach(function(e){
+      h+='<div class="trow'+(e.ours?' ours':'')+'" style="grid-template-columns:1fr 90px 1fr 130px 90px 95px;">'+
+        '<div><span class="tname">'+esc(e.team)+'</span>'+(e.ours?'<span class="badge">OURS</span>':'')+'</div>'+
+        '<div class="num">'+esc(e.job)+'</div>'+
+        '<div class="hidesm" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(e.customer)+'</div>'+
+        '<div class="tco hidesm">'+esc(e.bu)+'</div>'+
+        '<div class="r num" style="font-weight:700">'+money(e.amount)+'</div>'+
+        '<div class="r num">'+esc(e.completed)+'</div></div>';
+    });
+    h+='<div class="foot">These completed install jobs have no Sold By on the ServiceTitan report, so their revenue isn\'t credited to any Comfort Advisor in the contest. Send this list to each partner to clean up job attribution — amounts count toward team totals but not individual leaderboards.</div></div></section>';
+    return h;
+  }
+
+  function exportCsv(){
+    var rows = state.exTeam==='all' ? D.exceptions : D.exceptions.filter(function(e){ return e.team===state.exTeam; });
+    var head = ['Team','Tenant','Job #','Invoice #','Customer','Business Unit','Job Type','Amount','Completed'];
+    var lines = [head.join(',')].concat(rows.map(function(e){
+      return [e.team,e.tenant,e.job,e.invoice,'"'+String(e.customer).replace(/"/g,'""')+'"','"'+e.bu+'"','"'+String(e.jobType).replace(/"/g,'""')+'"',e.amount,e.completed].join(',');
+    }));
+    var blob = new Blob([lines.join('\r\n')], {type:'text/csv'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'hyperion-exceptions-'+D.asOf+(state.exTeam==='all'?'':'-'+state.exTeam.replace(/\W+/g,'_'))+'.csv';
+    a.click();
+  }
+
+  // ---------- render + events ----------
+  function render(){
+    renderTabs();
+    var m=document.getElementById('main');
+    if(state.page==='overview') m.innerHTML=viewOverview();
+    else if(state.page==='reps') m.innerHTML=viewReps();
+    else if(state.page==='exceptions') m.innerHTML=viewExceptions();
+    else m.innerHTML=viewCompany(state.page);
+    window.scrollTo(0,0);
+  }
+
+  document.addEventListener('click', function(e){
+    var el=e.target.closest('[data-page]');
+    if(el){ state.page=el.getAttribute('data-page'); render(); return; }
+    el=e.target.closest('.sortable[data-sort]');
+    if(el){ state.sort=el.getAttribute('data-sort'); render(); return; }
+    el=e.target.closest('.btn[data-scope]');
+    if(el){ state.scope=el.getAttribute('data-scope'); render(); return; }
+    if(e.target.id==='exCsv'){ exportCsv(); }
+  });
+  document.addEventListener('input', function(e){
+    if(e.target.id==='repSearch'){
+      state.q=e.target.value;
+      var scroll=window.scrollY; render();
+      var inp=document.getElementById('repSearch'); inp.focus(); inp.setSelectionRange(inp.value.length,inp.value.length);
+      window.scrollTo(0,scroll);
+    }
+  });
+  document.addEventListener('change', function(e){
+    if(e.target.id==='exTeam'){ state.exTeam=e.target.value; render(); }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

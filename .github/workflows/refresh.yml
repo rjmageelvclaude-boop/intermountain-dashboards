@@ -1,0 +1,56 @@
+name: Refresh dashboard
+
+on:
+  schedule:
+    - cron: "10 * * * *"        # hourly at :10 (UTC)
+  workflow_dispatch:            # manual "Run workflow" button
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install --quiet openpyxl
+
+      - name: Fetch newest reports from Gmail
+        env:
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+        run: python build/fetch_gmail.py
+
+      - name: Parse reports -> site/hyperion-data.js
+        run: |
+          if [ -f data/sales_by_rep.xlsx ] && [ -f data/installed_by_rep.xlsx ]; then
+            python build/parse_reports.py
+          else
+            echo "No report files available - deploying last committed data."
+          fi
+
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

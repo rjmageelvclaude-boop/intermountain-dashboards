@@ -1,0 +1,8 @@
+# Raw ServiceTitan exports contain customer names/addresses - never commit them.
+data/
+*.xlsx
+*.pptx
+
+# OS noise
+Thumbs.db
+Desktop.ini
