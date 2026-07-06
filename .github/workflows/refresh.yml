@@ -32,18 +32,32 @@ jobs:
       - name: Install dependencies
         run: pip install --quiet openpyxl
 
+      - name: Restore last good reports
+        uses: actions/cache/restore@v4
+        with:
+          path: data
+          key: reports-${{ github.run_id }}
+          restore-keys: reports-
+
       - name: Fetch newest reports from Gmail
         env:
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
         run: python build/fetch_gmail.py
 
+      - name: Save reports for next run
+        uses: actions/cache/save@v4
+        with:
+          path: data
+          key: reports-${{ github.run_id }}
+
       - name: Parse reports -> site/hyperion-data.js
         run: |
           if [ -f data/sales_by_rep.xlsx ] && [ -f data/installed_by_rep.xlsx ]; then
             python build/parse_reports.py
           else
-            echo "No report files available - deploying last committed data."
+            echo "Missing report file(s) - deploying last committed data."
+            ls -la data/ 2>/dev/null || true
           fi
 
       - name: Upload site
