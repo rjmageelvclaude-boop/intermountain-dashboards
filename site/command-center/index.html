@@ -201,7 +201,7 @@ function render(){
   var bde=wdElapsed-nbdElapsed;
   var bdr=bd-bde;
 
-  var monthlyBudget=(gb(act,"dailyRevenueBudget")||0)*bd;
+  var monthlyBudget=gb(act,"monthlyBudget")||(gb(act,"dailyRevenueBudget")||0)*bd;
   var monthlyPlan=gb(act,"monthlyPlan")||0;
   var dailyRevBgt=gb(act,"dailyRevenueBudget");
   var dailySalesBgt=gb(act,"dailySalesBudget");
@@ -224,6 +224,7 @@ function render(){
   var bFields=[
     {k:"dailyRevenueBudget",l:"Daily Revenue Budget",type:"number"},
     {k:"dailySalesBudget",l:"Daily Sales Budget",type:"number"},
+    {k:"monthlyBudget",l:"Monthly Budget",type:"number"},
     {k:"monthlyPlan",l:"Monthly Plan",type:"number"},
     {k:"hvacJobBudget",l:"HVAC Job Budget",type:"number"},
     ...(co.plumb?[{k:"plumbJobBudget",l:"Plumbing Job Budget",type:"number"}]:[]),
