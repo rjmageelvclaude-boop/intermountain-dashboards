@@ -159,6 +159,8 @@
         <div class="chip" style="background:var(--red);color:#fff;" id="weekChip"></div>
         <div class="chip" style="background:rgba(255,255,255,.08);color:var(--gold);" id="daysChip"></div>
         <div class="meta" id="metaLine"></div>
+        <div class="chip" id="refreshBtn" title="Pull the latest published numbers"
+             style="background:rgba(255,255,255,.08);color:#F5F1E8;cursor:pointer;user-select:none;">⟳ REFRESH</div>
       </div>
     </div>
     <div class="tabs" id="tabs"></div>
@@ -169,17 +171,13 @@
 <script src="./hyperion-data.js"></script>
 <script>
 (function(){
-  var D = window.HYPERION_DATA;
-  var GOAL = D.contest.hyperionGoal, DAYS = D.contest.totalDays || 62;
-  var PACE = GOAL * D.dayNum / DAYS;
+  var D, GOAL, DAYS, PACE, teams, ourTeams, TABS;
 
   var money = function(n){ return '$' + Math.round(n).toLocaleString('en-US'); };
   var moneyK = function(n){ return n>=1e6 ? '$'+(n/1e6).toFixed(2)+'M' : '$'+Math.round(n/1000)+'K'; };
   var moneyK1 = function(n){ return '$'+(n/1000).toFixed(1)+'K'; };
   var esc = function(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); };
 
-  var teams = Object.values(D.teams);
-  var ourTeams = teams.filter(function(t){ return t.ours; });
   var OUR_TAB_ORDER = ['sierra','ultimate','brothers','russett'];
 
   // ---------- shared derivations ----------
@@ -216,14 +214,46 @@
     return '<div class="kpi"><div class="l">'+l+'</div><div class="v"'+(color?' style="color:'+color+'"':'')+'>'+v+'</div>'+(s?'<div class="s">'+s+'</div>':'')+'</div>';
   }
 
-  // ---------- header ----------
-  document.getElementById('weekChip').textContent = D.week.label.toUpperCase();
-  document.getElementById('daysChip').textContent = D.daysLeftWeek + ' DAYS LEFT THIS WEEK';
-  document.getElementById('metaLine').textContent = D.phase+' · Day '+D.dayNum+' of '+DAYS+' · data thru '+D.asOf+' · updated '+D.generatedAt;
+  // ---------- data load / refresh ----------
+  function applyData(d){
+    D = d;
+    GOAL = D.contest.hyperionGoal; DAYS = D.contest.totalDays || 62;
+    PACE = GOAL * D.dayNum / DAYS;
+    teams = Object.values(D.teams);
+    ourTeams = teams.filter(function(t){ return t.ours; });
+    TABS = [{k:'overview',l:'OVERVIEW'},{k:'reps',l:'COMFORT ADVISORS'}]
+      .concat(OUR_TAB_ORDER.map(function(k){ return {k:k, l:D.teams[k].name.toUpperCase()}; }))
+      .concat([{k:'exceptions',l:'EXCEPTIONS'}]);
+    document.getElementById('weekChip').textContent = D.week.label.toUpperCase();
+    document.getElementById('daysChip').textContent = D.daysLeftWeek + ' DAYS LEFT THIS WEEK';
+    document.getElementById('metaLine').textContent = D.phase+' · Day '+D.dayNum+' of '+DAYS+' · data thru '+D.asOf+' · updated '+D.generatedAt;
+  }
 
-  var TABS = [{k:'overview',l:'OVERVIEW'},{k:'reps',l:'COMFORT ADVISORS'}]
-    .concat(OUR_TAB_ORDER.map(function(k){ return {k:k, l:D.teams[k].name.toUpperCase()}; }))
-    .concat([{k:'exceptions',l:'EXCEPTIONS'}]);
+  function refreshData(manual){
+    var btn = document.getElementById('refreshBtn');
+    if(manual){ btn.textContent = '⟳ REFRESHING…'; }
+    return fetch('./hyperion-data.js?t=' + Date.now(), {cache:'no-store'})
+      .then(function(r){ if(!r.ok) throw new Error(r.status); return r.text(); })
+      .then(function(t){
+        var d = JSON.parse(t.slice(t.indexOf('{'), t.lastIndexOf('}')+1));
+        var changed = !D || d.generatedAt !== D.generatedAt;
+        if(changed){
+          var y = window.scrollY;
+          applyData(d); render();
+          window.scrollTo(0, y);
+        }
+        if(manual){
+          btn.textContent = changed ? '✓ UPDATED' : '✓ UP TO DATE';
+          setTimeout(function(){ btn.textContent = '⟳ REFRESH'; }, 2500);
+        }
+      })
+      .catch(function(){
+        if(manual){
+          btn.textContent = '⚠ RETRY';
+          setTimeout(function(){ btn.textContent = '⟳ REFRESH'; }, 2500);
+        }
+      });
+  }
 
   var state = { page:'overview', sort:'installed', scope:'all', q:'', exTeam:'all' };
 
@@ -511,6 +541,7 @@
   }
 
   document.addEventListener('click', function(e){
+    if(e.target.id==='refreshBtn'){ refreshData(true); return; }
     var el=e.target.closest('[data-page]');
     if(el){ state.page=el.getAttribute('data-page'); render(); return; }
     el=e.target.closest('.sortable[data-sort]');
@@ -531,7 +562,9 @@
     if(e.target.id==='exTeam'){ state.exTeam=e.target.value; render(); }
   });
 
+  applyData(window.HYPERION_DATA);
   render();
+  setInterval(function(){ refreshData(false); }, 5*60*1000);  // silent auto-refresh
 })();
 </script>
 </body>

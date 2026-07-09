@@ -6,6 +6,12 @@
       "runtimeExecutable": "py",
       "runtimeArgs": ["-m", "http.server", "8777", "--directory", "site"],
       "port": 8777
+    },
+    {
+      "name": "command-center",
+      "runtimeExecutable": "py",
+      "runtimeArgs": ["build/command_center_server.py"],
+      "port": 8778
     }
   ]
 }

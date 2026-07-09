@@ -6,3 +6,9 @@ data/
 # OS noise
 Thumbs.db
 Desktop.ini
+
+# ServiceTitan API credentials - never commit these.
+secrets/
+
+# Python bytecode
+__pycache__/

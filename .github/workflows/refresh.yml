@@ -1,8 +1,8 @@
-name: Refresh dashboard
+name: Refresh dashboards
 
 on:
   schedule:
-    - cron: "10 * * * *"        # hourly at :10 (UTC)
+    - cron: "*/15 * * * *"      # every 15 minutes (UTC)
   workflow_dispatch:            # manual "Run workflow" button
   push:
     branches: [main]
@@ -32,24 +32,21 @@ jobs:
       - name: Install dependencies
         run: pip install --quiet openpyxl
 
-      - name: Restore last good reports
+      - name: Restore cached reports + Command Center history
         uses: actions/cache/restore@v4
         with:
-          path: data
+          path: |
+            data
+            site/command-center/data.json
           key: reports-${{ github.run_id }}
           restore-keys: reports-
 
+      # ---- Contest dashboard (still fed by emailed reports) ----
       - name: Fetch newest reports from Gmail
         env:
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
-        run: python build/fetch_gmail.py
-
-      - name: Save reports for next run
-        uses: actions/cache/save@v4
-        with:
-          path: data
-          key: reports-${{ github.run_id }}
+        run: python build/fetch_gmail.py || echo "Gmail fetch failed - using cached reports"
 
       - name: Parse reports -> site/hyperion-data.js
         run: |
@@ -59,6 +56,26 @@ jobs:
             echo "Missing report file(s) - deploying last committed data."
             ls -la data/ 2>/dev/null || true
           fi
+
+      # ---- Command Center (live from the ServiceTitan API - no Gmail) ----
+      - name: Command Center -> site/command-center/data.json
+        env:
+          ST_SECRETS_JSON: ${{ secrets.ST_SECRETS_JSON }}
+          ST_TIMEOUT: "120"
+        run: |
+          mkdir -p secrets
+          printf '%s' "$ST_SECRETS_JSON" > secrets/servicetitan.json
+          python build/command_center_refresh.py || echo "ST refresh failed - deploying cached data.json"
+          rm -rf secrets
+
+      - name: Save reports + history for next run
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: |
+            data
+            site/command-center/data.json
+          key: reports-${{ github.run_id }}
 
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
