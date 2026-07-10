@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>4 Day Call Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Montserrat','Segoe UI',system-ui,sans-serif;background:#fff;color:#111;min-height:100vh}
+.wrap{max-width:1500px;margin:0 auto;padding:18px 26px 30px}
+.topbar{display:flex;align-items:center;gap:18px;margin-bottom:14px}
+.big-title{font-size:52px;font-weight:900;letter-spacing:-1px;text-transform:uppercase;line-height:1;flex-shrink:0}
+.pager{flex:1;display:flex;justify-content:center;align-items:center;gap:14px;font-size:14px;font-weight:700;color:#555}
+.pager .pgbtn{cursor:pointer;user-select:none;color:#111;letter-spacing:.5px}
+.pager .pgbtn:hover{color:var(--co)}
+.pager .pgbtn.dim{color:#bbb;cursor:default}
+.pager .sep{color:#ccc}
+.co-badge{flex-shrink:0;text-align:right}
+.co-name{font-size:20px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:var(--co);line-height:1.1}
+.co-trade{font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:1px}
+.tbl-scroll{overflow-x:auto}
+table{width:100%;min-width:760px;border-collapse:separate;border-spacing:0 6px}
+td,th{padding:13px 16px;font-size:19px;font-weight:800}
+th{text-align:left}
+td{text-align:center;width:19%}
+.lbl{background:#e9eaec;text-transform:uppercase;letter-spacing:.5px;font-size:17px;white-space:nowrap}
+.hdr td{background:#e9eaec;text-transform:uppercase;font-size:18px}
+.hdr .sub{display:block;font-size:11px;font-weight:700;color:#888;letter-spacing:1px}
+tr.zebra td:not(.lbl){background:#f3f4f6}
+.band td{background:var(--co);color:#fff;text-transform:uppercase;font-size:19px;letter-spacing:1px;padding:12px}
+.temp{font-size:17px;white-space:nowrap}
+.temp .wx{font-size:22px;vertical-align:-2px;margin-left:6px}
+.neg{background:#f5989d!important;color:#111}
+.pos{background:#27a54a!important;color:#fff}
+.edit{cursor:pointer;position:relative}
+.edit:hover{outline:2px dashed var(--co);outline-offset:-2px}
+.edit:hover::after{content:"✎";position:absolute;top:3px;right:6px;font-size:11px;color:var(--co)}
+.lbl.edit:hover::after{content:"✎ default"}
+.dash{color:#999}
+.footer{margin-top:14px;display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:#999;flex-wrap:wrap;gap:6px}
+.dots{display:flex;gap:7px;justify-content:center;margin-top:12px}
+.dots span{width:9px;height:9px;border-radius:50%;background:#ddd;cursor:pointer}
+.dots span.on{background:var(--co)}
+@media(max-width:900px){.big-title{font-size:34px}.co-name{font-size:15px}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+<div style="display:flex;justify-content:center;align-items:center;height:80vh;color:#94a3b8"><div style="text-align:center"><div style="font-size:32px;margin-bottom:12px">📞</div><div style="font-size:14px;font-weight:600">Loading 4 Day Call Board...</div></div></div>
+</div>
+<script>
+// Manual inputs (techs available / calls needed / ROPPs needed) are shared for
+// all viewers through the same PIN-protected Apps Script store the Command
+// Center uses for budgets, namespaced under co="callboard".
+const BUDGET_URL="https://script.google.com/macros/s/AKfycby-J4xARcDQoDUwSfX6qsjYnM_QZyDfhd09WVBQXomJkLsrDysnkw-L0EZu0_S9Q4kz-w/exec";
+const DATA_URL="data.json";
+const ROTATE_SECONDS=20;      // auto-advance between boards
+const REFRESH_MINUTES=5;      // re-pull data.json + shared inputs
+const ROPP_GREEN_PCT=35;      // ROPP % turns green at/above this
+
+const PIN_KEY="pcc-pin";      // same PIN cache as the Command Center
+const LS_KEY="cb-settings-v1";
+const ORDER=["sierra-hvac","sierra-plumbing","ultimate-hvac","ultimate-plumbing","russett-hvac"];
+const CO_COLOR={sierra:"#24408e",ultimate:"#6d28d9",russett:"#b91c1c"};
+
+let data=null,settings=JSON.parse(localStorage.getItem(LS_KEY)||"{}"),synced=false;
+let idx=0,paused=false,feedError=null;
+
+// ── shared settings (Apps Script) ──
+async function post(body){
+  var r=await fetch(BUDGET_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(body)});
+  return r.json();
+}
+async function loadSettings(){
+  try{
+    var j=await post({action:"getBudgets"});
+    if(j&&j.ok){settings=(j.budgets&&j.budgets.callboard)||{};synced=true;localStorage.setItem(LS_KEY,JSON.stringify(settings))}
+  }catch(e){console.warn("Shared inputs unavailable - using this device's saved values",e)}
+}
+async function saveSetting(key,value){
+  settings[key]=value;localStorage.setItem(LS_KEY,JSON.stringify(settings));render();
+  if(!synced)return;
+  var pin=localStorage.getItem(PIN_KEY)||prompt("Enter the PIN to save shared board inputs:");
+  if(!pin)return;
+  try{
+    var j=await post({action:"setBudget",pin:pin,co:"callboard",key:key,value:value});
+    if(j&&j.ok){localStorage.setItem(PIN_KEY,pin);settings=(j.budgets&&j.budgets.callboard)||settings;localStorage.setItem(LS_KEY,JSON.stringify(settings))}
+    else if(j&&j.error==="bad-pin"){localStorage.removeItem(PIN_KEY);alert("Wrong PIN - change was NOT saved for other viewers.")}
+    else{alert("Could not save shared input: "+((j&&j.error)||"unknown error"))}
+  }catch(e){alert("Could not reach the settings server - change saved on this device only.")}
+  render();
+}
+// value for a manual field: per-date override, else board default
+function getVal(board,date,field){
+  var v=settings[board+"|"+date+"|"+field];
+  if(v===undefined||v==="")v=settings[board+"|default|"+field];
+  return(v===undefined||v==="")?null:Number(v);
+}
+function editCell(board,date,field,label,dayLabel){
+  var cur=getVal(board,date,field);
+  var v=prompt(label+" - "+dayLabel+":",cur===null?"":cur);
+  if(v===null)return;
+  v=v.trim();
+  if(v!==""&&isNaN(Number(v))){alert("Enter a number.");return}
+  saveSetting(board+"|"+date+"|"+field,v===""?"":Number(v));
+}
+function editDefault(board,field,label){
+  var cur=settings[board+"|default|"+field];
+  var v=prompt(label+" - default for ALL days on this board (per-day edits override it):",cur===undefined?"":cur);
+  if(v===null)return;
+  v=v.trim();
+  if(v!==""&&isNaN(Number(v))){alert("Enter a number.");return}
+  saveSetting(board+"|default|"+field,v===""?"":Number(v));
+}
+
+// ── weather ──
+function wxIcon(code){
+  if(code===0)return"☀️";
+  if(code<=2)return"🌤️";
+  if(code===3)return"☁️";
+  if(code<=48)return"🌫️";
+  if(code<=67)return"🌧️";
+  if(code<=77)return"❄️";
+  if(code<=82)return"🌦️";
+  return"⛈️";
+}
+
+// ── render ──
+function fmtDate(iso){var d=new Date(iso+"T12:00:00");return d.toLocaleString("default",{month:"short",day:"numeric"}).toUpperCase()}
+function td(v,cls){return'<td class="'+(cls||"")+'">'+v+'</td>'}
+
+function manualRow(b,board,label,field){
+  var cells=b.days.map(function(d){
+    var v=getVal(board,d.date,field);
+    return'<td class="edit" onclick="editCell(\''+board+'\',\''+d.date+'\',\''+field+'\',\''+label+'\',\''+d.dow+' '+fmtDate(d.date)+'\')">'+(v===null?'<span class="dash">—</span>':v)+'</td>';
+  }).join("");
+  return'<tr class="zebra"><th class="lbl edit" onclick="editDefault(\''+board+'\',\''+field+'\',\''+label+'\')">'+label+'</th>'+cells+'</tr>';
+}
+
+function render(){
+  var app=document.getElementById("app");
+  if(feedError&&!data){app.innerHTML='<div style="text-align:center;padding:80px 20px;color:#94a3b8;font-weight:600">'+feedError+'</div>';return}
+  if(!data)return;
+  var board=ORDER[idx],b=data.boards[board];
+  if(!b){idx=0;board=ORDER[0];b=data.boards[board]}
+  var color=CO_COLOR[b.company]||"#24408e";
+  document.documentElement.style.setProperty("--co",color);
+  var wx=(data.weather||{})[b.company]||null;
+
+  var hdr='<tr class="hdr"><th class="lbl">Day</th>'+b.days.map(function(d){
+    return'<td>'+d.dow+'<span class="sub">'+fmtDate(d.date)+'</span></td>'}).join("")+'</tr>';
+
+  var temp='<tr><th class="lbl">Temperature</th>'+b.days.map(function(d){
+    var w=wx&&wx[d.date];
+    return td(w?('<span class="temp">'+w.min+'&deg; - '+w.max+'&deg;<span class="wx">'+wxIcon(w.code)+'</span></span>'):'<span class="dash">—</span>');
+  }).join("")+'</tr>';
+
+  var band='<tr class="band"><td colspan="5">'+b.companyShort+' &nbsp;·&nbsp; '+b.title+'</td></tr>';
+
+  var techs=manualRow(b,board,"Techs Available","techs");
+
+  var onBoard='<tr><th class="lbl">Current Calls on Board</th>'+b.days.map(function(d){return td(d.opps)}).join("")+'</tr>';
+  var nonOpp='<tr class="zebra"><th class="lbl">Non-Opportunity Calls</th>'+b.days.map(function(d){return td(d.nonOpps)}).join("")+'</tr>';
+
+  var needed=manualRow(b,board,"Calls Needed","calls");
+
+  var variance='<tr><th class="lbl">Variance</th>'+b.days.map(function(d){
+    var n=getVal(board,d.date,"calls");
+    if(n===null)return td('<span class="dash">—</span>');
+    var v=d.opps-n;return td((v>0?"+":"")+v,v>=0?"pos":"neg");
+  }).join("")+'</tr>';
+
+  var ropps='<tr class="zebra"><th class="lbl">Replacement Opps</th>'+b.days.map(function(d){return td(d.ropps)}).join("")+'</tr>';
+
+  var roppNeeded=manualRow(b,board,"Replacement Opps Needed","ropps");
+
+  var roppVar='<tr><th class="lbl">Replacement Opps Variance</th>'+b.days.map(function(d){
+    var n=getVal(board,d.date,"ropps");
+    if(n===null)return td('<span class="dash">—</span>');
+    var v=d.ropps-n;return td((v>0?"+":"")+v,v>=0?"pos":"neg");
+  }).join("")+'</tr>';
+
+  var roppPct='<tr class="zebra"><th class="lbl">Replacement Opps %</th>'+b.days.map(function(d){
+    if(!d.opps)return td('<span class="dash">—</span>');
+    var p=Math.round(d.ropps/d.opps*100);
+    return td((p>=ROPP_GREEN_PCT?"+":"")+p+"%",p>=ROPP_GREEN_PCT?"pos":"neg");
+  }).join("")+'</tr>';
+
+  var gen=data.generatedAt?new Date(data.generatedAt).toLocaleString():"?";
+  app.innerHTML=
+    '<div class="topbar">'+
+      '<div class="big-title">4 Day Call</div>'+
+      '<div class="pager">'+
+        '<span>'+(idx+1)+' of '+ORDER.length+'</span><span class="sep">|</span>'+
+        '<span class="pgbtn" onclick="nav(-1)">&lsaquo; PREV</span>'+
+        '<span class="pgbtn" onclick="nav(1)">NEXT &rsaquo;</span><span class="sep">|</span>'+
+        '<span class="pgbtn" onclick="togglePause()">'+(paused?"PLAY &#9654;":"PAUSE &#10073;&#10073;")+'</span>'+
+      '</div>'+
+      '<div class="co-badge"><div class="co-name">'+b.companyShort+'</div><div class="co-trade">'+b.trade+'</div></div>'+
+    '</div>'+
+    '<div class="tbl-scroll"><table>'+hdr+temp+band+techs+onBoard+nonOpp+needed+variance+ropps+roppNeeded+roppVar+roppPct+'</table></div>'+
+    '<div class="dots">'+ORDER.map(function(k,i){return'<span class="'+(i===idx?"on":"")+'" onclick="goTo('+i+')"></span>'}).join("")+'</div>'+
+    '<div class="footer">'+
+      '<span>Live from ServiceTitan &middot; opportunities counted by job-type class &middot; ROPP tag minus Management Removed ROPP</span>'+
+      '<span>Click a value in Techs Available / Calls Needed / Replacement Opps Needed to edit (PIN) &middot; Updated '+gen+'</span>'+
+    '</div>'+
+    (feedError?'<div style="margin-top:8px;font-size:12px;font-weight:700;color:#b91c1c">'+feedError+'</div>':'');
+}
+
+function nav(d){idx=(idx+d+ORDER.length)%ORDER.length;render()}
+function goTo(i){idx=i;render()}
+function togglePause(){paused=!paused;render()}
+
+// ── data feed ──
+async function fetchData(){
+  try{
+    var r=await fetch(DATA_URL+"?t="+Date.now(),{cache:"no-store"});
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    data=await r.json();feedError=null;
+  }catch(e){
+    console.error(e);
+    feedError=data?"Data feed temporarily unavailable - showing the last good pull.":"Data feed unavailable - try again in a minute.";
+  }
+}
+async function refresh(){await Promise.all([fetchData(),loadSettings()]);render()}
+
+// ── access gate (hosted mode only; same code as the Command Center) ──
+const ACCESS_HASH="a317cc2a63bdef8b314787da505ec86458118b1d9f87d95a6b3fa4272a582e16";
+const ACCESS_KEY="cc-access-v1";
+async function sha256hex(s){
+  var b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));
+  return[...new Uint8Array(b)].map(function(x){return x.toString(16).padStart(2,"0")}).join("");
+}
+async function gate(){
+  var isLocal=location.protocol!=="https:";
+  if(isLocal||!window.isSecureContext)return true;
+  if(localStorage.getItem(ACCESS_KEY)===ACCESS_HASH)return true;
+  for(;;){
+    var code=prompt("4 Day Call Board\n\nEnter access code:");
+    if(code===null)continue;
+    if(await sha256hex(code.trim())===ACCESS_HASH){localStorage.setItem(ACCESS_KEY,ACCESS_HASH);return true}
+    alert("Wrong access code.");
+  }
+}
+gate().then(refresh);
+setInterval(function(){if(!paused)nav(1)},ROTATE_SECONDS*1000);
+setInterval(refresh,REFRESH_MINUTES*60*1000);
+document.addEventListener("keydown",function(e){
+  if(e.key==="ArrowRight")nav(1);
+  else if(e.key==="ArrowLeft")nav(-1);
+  else if(e.key===" "){e.preventDefault();togglePause()}
+});
+</script>
+</body>
+</html>

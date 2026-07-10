@@ -38,6 +38,7 @@ jobs:
           path: |
             data
             site/command-center/data.json
+            site/call-board/data.json
           key: reports-${{ github.run_id }}
           restore-keys: reports-
 
@@ -57,7 +58,7 @@ jobs:
             ls -la data/ 2>/dev/null || true
           fi
 
-      # ---- Command Center (live from the ServiceTitan API - no Gmail) ----
+      # ---- Command Center + 4 Day Call board (live from the ServiceTitan API) ----
       - name: Command Center -> site/command-center/data.json
         env:
           ST_SECRETS_JSON: ${{ secrets.ST_SECRETS_JSON }}
@@ -66,6 +67,7 @@ jobs:
           mkdir -p secrets
           printf '%s' "$ST_SECRETS_JSON" > secrets/servicetitan.json
           python build/command_center_refresh.py || echo "ST refresh failed - deploying cached data.json"
+          python build/call_board_refresh.py || echo "Call board refresh failed - deploying cached data.json"
           rm -rf secrets
 
       - name: Save reports + history for next run
@@ -75,6 +77,7 @@ jobs:
           path: |
             data
             site/command-center/data.json
+            site/call-board/data.json
           key: reports-${{ github.run_id }}
 
       - name: Upload site
