@@ -194,10 +194,11 @@ def _parse_st_ts(ts):
     return dt.datetime.strptime(ts[:19], "%Y-%m-%dT%H:%M:%S")
 
 
-def compute_upcoming(company, n_days=UPCOMING_DAYS):
-    """Calls on the board by day and business unit for the next n_days
-    (company-local, starting today). One count per (day, job): a job appears
-    on each day it has a non-canceled appointment; canceled jobs excluded."""
+def _company_pull(company, n_days=UPCOMING_DAYS):
+    """One bulk pull per company covering the next n_days: jobs joined to their
+    appointments, bucketed by local day. Returns (day_jobs, by_day) where
+    day_jobs = {iso: [job, ...]} (deduped per day, board BUs only, canceled
+    jobs/appointments excluded) and by_day = {iso: {col_key: count}}."""
     co = COMPANIES[company]
     tenant = co["tenant"]
     tz = co["tz"]
@@ -219,6 +220,7 @@ def compute_upcoming(company, n_days=UPCOMING_DAYS):
 
     by_day = {(today + dt.timedelta(days=i)).isoformat(): {c["key"]: 0 for c in co["cols"]}
               for i in range(n_days)}
+    day_jobs = {iso: [] for iso in by_day}
     seen = set()
     for a in appts:
         if a.get("status") == "Canceled":
@@ -236,16 +238,23 @@ def compute_upcoming(company, n_days=UPCOMING_DAYS):
             continue
         seen.add((iso, job["id"]))
         by_day[iso][bu_key[job["businessUnitId"]]] += 1
+        day_jobs[iso].append(job)
+    return day_jobs, by_day
 
-    # day-over-day change tracking: keep one snapshot per local day on disk;
-    # the page compares against the most recent snapshot before today
+
+def upcoming_output(company, by_day):
+    """The Upcoming Jobs feed + day-over-day change tracking: one snapshot per
+    local day kept on disk; the page compares against the most recent snapshot
+    before today."""
+    co = COMPANIES[company]
+    today = local_today(co["tz"]).isoformat()
     hist = _load_json(UPCOMING_HISTORY, {})
     mine = hist.setdefault(company, {})
-    mine[today.isoformat()] = by_day
-    cutoff = (today - dt.timedelta(days=UPCOMING_HISTORY_KEEP_DAYS)).isoformat()
+    mine[today] = by_day
+    cutoff = (local_today(co["tz"]) - dt.timedelta(days=UPCOMING_HISTORY_KEEP_DAYS)).isoformat()
     hist[company] = {k: v for k, v in mine.items() if k >= cutoff}
     _save_json(UPCOMING_HISTORY, hist)
-    prev_stamp = max((k for k in hist[company] if k < today.isoformat()), default=None)
+    prev_stamp = max((k for k in hist[company] if k < today), default=None)
 
     return {
         "cols": [{"key": c["key"], "label": c["label"], "group": c["group"]} for c in co["cols"]],
@@ -257,14 +266,6 @@ def compute_upcoming(company, n_days=UPCOMING_DAYS):
 
 
 # --------------------------------------------------------------- metric core
-def _board_jobs(tenant, tz, day):
-    """Non-canceled jobs with an appointment starting on the given local day."""
-    start, end = local_day_window_utc(tz, day)
-    jobs = fetch_all(tenant, "/jpm/v2/tenant/{tenant}/jobs",
-                     {"appointmentStartsOnOrAfter": start, "appointmentStartsBefore": end})
-    return [j for j in jobs if j.get("jobStatus") != "Canceled"]
-
-
 def compute(only_board=None):
     wanted = {k: b for k, b in BOARDS.items() if only_board in (None, k)}
     if not wanted:
@@ -273,21 +274,14 @@ def compute(only_board=None):
     out = {"generatedAt": dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
            "boards": {}, "weather": {}, "upcoming": {}}
 
+    # One bulk 60-day pull per company feeds both the 4-day boards and the
+    # Upcoming Jobs view.
+    day_jobs = {}
     companies = {b["company"] for b in wanted.values()}
     for company in companies:
         out["weather"][company] = _weather(company)
-        try:
-            out["upcoming"][company] = compute_upcoming(company)
-        except Exception as e:
-            print(f"upcoming jobs failed for {company}: {e}", file=sys.stderr)
-            out["upcoming"][company] = None
-
-    # One jobs fetch per (tenant, day), shared by every board on that tenant.
-    day_jobs = {}
-    for company in companies:
-        co = COMPANIES[company]
-        for day in board_days(co["tz"]):
-            day_jobs[(company, day)] = _board_jobs(co["tenant"], co["tz"], day)
+        day_jobs[company], by_day = _company_pull(company)
+        out["upcoming"][company] = upcoming_output(company, by_day)
 
     for key, b in wanted.items():
         company = b["company"]
@@ -298,7 +292,8 @@ def compute(only_board=None):
         removed = set(b["ropp_removed_tags"])
         days = []
         for day in board_days(co["tz"]):
-            jobs = [j for j in day_jobs[(company, day)] if j.get("businessUnitId") in bus]
+            jobs = [j for j in day_jobs[company].get(day.isoformat(), [])
+                    if j.get("businessUnitId") in bus]
             opps = non_opps = ropps = 0
             for j in jobs:
                 if is_opportunity(j, thresholds):

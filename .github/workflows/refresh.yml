@@ -12,9 +12,12 @@ permissions:
   pages: write
   id-token: write
 
+# Never cancel a running refresh - runs can exceed the 10-min dispatch interval,
+# and cancelling in progress meant no run ever finished. GitHub keeps at most one
+# pending run per group, so newer dispatches still replace the queued one.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build-and-deploy:
