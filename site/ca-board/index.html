@@ -54,6 +54,19 @@ body{font-family:'Montserrat','Segoe UI',system-ui,sans-serif;background:#e9eaec
 .krow.disc-r{background:#dc2626;color:#fff}.krow.disc-r .kl{color:#fcdcdc}
 .fcard .krow{font-size:19px;padding:12px 16px}
 .fcard .krow .kl{font-size:15px}
+/* ── GOAT trip pacing (YTD only) ── */
+.goat{margin-bottom:8px}
+.goat-track{position:relative;height:12px;border-radius:6px;background:#e2e4e8;overflow:visible}
+.goat-fill{height:100%;border-radius:6px;background:#eab308;min-width:2px}
+.goat.ahead .goat-fill{background:#27a54a}
+.goat.done .goat-fill{background:linear-gradient(90deg,#d4a017,#f5c542)}
+.goat-tick{position:absolute;top:-3px;bottom:-3px;width:3px;background:#111;border-radius:2px}
+.goat-lbl{display:flex;justify-content:space-between;margin-top:4px;font-size:11px;font-weight:800;color:#8a8f98;text-transform:uppercase;letter-spacing:.4px}
+.goat-lbl .st{color:#b45309}
+.goat.ahead .goat-lbl .st{color:#1d7f38}
+.goat.done .goat-lbl .st{color:#b8860b}
+.fcard .goat-track{height:16px}
+.fcard .goat-lbl{font-size:13px}
 /* ── small cards ── */
 .c-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px}
 .c-name{font-size:19px;font-weight:900;letter-spacing:-.3px;line-height:1.1}
@@ -82,6 +95,7 @@ const REFRESH_MINUTES=5;        // re-pull data.json
 const ROTATE_SECONDS=20;        // auto-flip MTD <-> YTD within the selected tab
 const DISC_YELLOW=0.10;         // avg discount >= this shows yellow
 const DISC_RED=0.15;            // ... and >= this shows red
+const GOAT_GOAL=4000000;        // GOAT Group trip: CA sales goal for the calendar year
 
 const BOARD_ORDER=["sierra","ultimate","russett","combined"];
 const COMBINED={label:"Combined",color:"#111827"};
@@ -158,6 +172,29 @@ function tabsHTML(){
   return `<div class="tabwrap"><div class="viewtabs">${viewTabs}</div><div class="tabs">${coTabs}</div></div>`;
 }
 
+// GOAT trip pacing strip (YTD view only): progress to the $4M calendar-year
+// goal, a tick at where they "should" be today, and a run-rate projection.
+const moneyM=n=>n>=1e6?"$"+(n/1e6).toFixed(1)+"M":"$"+Math.round(n/1000)+"K";
+function goatHTML(a){
+  if(curView!=="ytd")return"";
+  const now=data.generatedAt?new Date(data.generatedAt):new Date();
+  const y=now.getFullYear();
+  const dayOfYear=Math.max(1,Math.floor((now-new Date(y,0,1))/864e5)+1);
+  const daysInYear=(y%4===0&&(y%100!==0||y%400===0))?366:365;
+  const paceFrac=dayOfYear/daysInYear;
+  const frac=a.sales/GOAT_GOAL;
+  const proj=a.sales/dayOfYear*daysInYear;
+  const cls=frac>=1?"done":frac>=paceFrac?"ahead":"";
+  const status=frac>=1?"&#128016; QUALIFIED":frac>=paceFrac?"Ahead of pace":"Behind pace";
+  return `<div class="goat ${cls}">
+    <div class="goat-track">
+      <div class="goat-fill" style="width:${Math.min(frac,1)*100}%"></div>
+      <div class="goat-tick" style="left:${Math.min(paceFrac,1)*100}%"></div>
+    </div>
+    <div class="goat-lbl"><span>&#128016; GOAT ${moneyM(GOAT_GOAL)} &middot; ${Math.round(frac*100)}%</span><span class="st">${status} &middot; proj ${moneyM(proj)}</span></div>
+  </div>`;
+}
+
 function render(){
   const app=document.getElementById("app");
   if(!data){
@@ -191,6 +228,7 @@ function render(){
         <div class="fc-head"><div><div class="fc-name">${esc(top.name)}</div><div class="fc-dept">${esc(top._dept)}</div></div><div class="rankb">#1</div></div>
         <div class="fc-photo">${photoHTML(top,true)}</div>
         <div class="salesbar"><span class="v">${money(top.sales)}</span><span class="l">Sales</span></div>
+        ${goatHTML(top)}
         ${kpisHTML(top)}
       </div></div>
       <div class="grid">`;
@@ -199,6 +237,7 @@ function render(){
       html+=`<div class="card" style="--co:${a._color}">
         <div class="c-head"><div><div class="c-name">${esc(a.name)}</div><div class="c-dept">${esc(a._dept)}</div></div><div class="rankb">#${rank}</div></div>
         <div class="salesbar"><span class="v">${money(a.sales)}</span><span class="l">Sales</span></div>
+        ${goatHTML(a)}
         <div class="c-body">
           <div class="c-photo">${photoHTML(a,false)}</div>
           <div class="c-kpis">${kpisHTML(a)}</div>
