@@ -36,7 +36,7 @@ def main():
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f)
     os.replace(tmp, OUT_PATH)
-    top = {c: [f"{r['name']} ${r['revenue']:,.0f}" for r in rows[:3]]
+    top = {c: [f"{r['name']} ${r['sales']:,.0f}" for r in rows[:3]]
            for c, rows in data["boards"]["mtd"].items() if c != "combined"}
     print(f"wrote {OUT_PATH} in {time.time() - t0:.0f}s (complete={data['complete']})")
     print(f"MTD top 3: {json.dumps(top)}")

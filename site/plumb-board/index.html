@@ -113,7 +113,7 @@ const kmoney = v => v >= 100000 ? "$" + Math.round(v / 1000) + "k"
 const prod = (n, amt) => n ? `${n} · ${kmoney(amt)}` : "0";
 
 const STATS = r => [
-  [money(r.sales), "Total Sales"], [money(r.avgTicket), "Avg Ticket"], [pct(r.convRate), "Opps Conv"],
+  [money(r.revenue), "Total Revenue"], [money(r.avgTicket), "Avg Ticket"], [pct(r.convRate), "Opps Conv"],
   [r.membSold, "Mem Sold"], [pct(r.membConv), "Mem Conv"], [pct(r.membOffered), "Mem Offered"],
   [prod(r.tanklessN, r.tanklessAmt), "Tankless"], [prod(r.tankedN, r.tankedAmt), "Tanked WH"],
   [prod(r.filtrationN, r.filtrationAmt), "Filtration"],
@@ -142,7 +142,7 @@ function featuredHtml(r, rank, board) {
       <div class="f-team">${r.team}${chip(r, board)}</div></div>
       <div class="rank">#${rank}</div></div>
     ${photoHtml(r, "f-photo")}
-    <div class="revbar"><span class="amt">${money(r.revenue)}</span><span class="lbl">Total Revenue</span></div>
+    <div class="revbar"><span class="amt">${money(r.sales)}</span><span class="lbl">Total Sales</span></div>
     ${statsHtml(r)}</div>`;
 }
 
@@ -151,7 +151,7 @@ function cardHtml(r, rank, board) {
     <div class="c-head"><div><div class="c-name">${r.name}</div>
       <div class="c-team">${r.team}${chip(r, board)}</div></div>
       <div class="rank">#${rank}</div></div>
-    <div class="revbar"><span class="amt">${money(r.revenue)}</span><span class="lbl">Total Revenue</span></div>
+    <div class="revbar"><span class="amt">${money(r.sales)}</span><span class="lbl">Total Sales</span></div>
     <div class="c-body">${photoHtml(r, "c-photo")}${statsHtml(r)}</div></div>`;
 }
 

@@ -2,7 +2,7 @@
 """
 Live ServiceTitan engine for the Plumber Leaderboard.
 
-Ranks active plumbing technicians by total revenue, MTD and YTD, for Sierra
+Ranks active plumbing technicians by total sales, MTD and YTD, for Sierra
 and Ultimate (plus a combined board). Roster comes from People > Technicians
 (active only), picked by team:
 
@@ -368,12 +368,12 @@ def compute(time_budget_secs=None, progress=None):
             rows_mtd.append(dict(base, **_finalize(mtd)))
             rows_ytd.append(dict(base, **_finalize(ytd)))
         for rows, view in ((rows_mtd, "mtd"), (rows_ytd, "ytd")):
-            rows.sort(key=lambda r: -r["revenue"])
+            rows.sort(key=lambda r: -r["sales"])
             boards[view][company] = rows
 
     for view in ("mtd", "ytd"):
         combined = [r for c in COMPANIES for r in boards[view][c]]
-        combined.sort(key=lambda r: -r["revenue"])
+        combined.sort(key=lambda r: -r["sales"])
         boards[view]["combined"] = combined
 
     today = local_today("pacific")
@@ -400,10 +400,10 @@ if __name__ == "__main__":
         t0 = time.time()
         roster = team_technicians(company)
         techs = compute_month(company, y, m)
-        rows = sorted(((c["revenue"], roster[tid]["name"], c) for tid, c in techs.items()
+        rows = sorted(((c["sales"], roster[tid]["name"], c) for tid, c in techs.items()
                        if tid in roster), reverse=True)
-        for rev, name, c in rows:
-            print(f"{name:28s} rev {rev:>10,.0f} jobs {c['jobs']:>3} opps {c['opps']:>3} "
+        for _, name, c in rows:
+            print(f"{name:28s} rev {c['revenue']:>10,.0f} jobs {c['jobs']:>3} opps {c['opps']:>3} "
                   f"conv {c['converted']:>3} sales {c['sales']:>9,.0f} memb {c['membSold']:>2} "
                   f"nonMem {c['nonMemberJobs']:>3} off {c['nonMemberOffered']:>3} "
                   f"tkls {c['tanklessN']}/${c['tanklessAmt']:,.0f} "
