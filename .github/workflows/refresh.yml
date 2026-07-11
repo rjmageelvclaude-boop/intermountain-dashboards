@@ -45,6 +45,7 @@ jobs:
             site/call-board/data.json
             site/ca-board/data.json
             site/tech-board/data.json
+            site/plumb-board/data.json
           key: reports-${{ github.run_id }}
           restore-keys: reports-
 
@@ -77,6 +78,7 @@ jobs:
           # YTD backfill does at most this many seconds per run and resumes from the
           # cached data/tech-board-history.json on the next run.
           TECH_BOARD_BUDGET: "90"
+          PLUMB_BOARD_BUDGET: "90"
         run: |
           mkdir -p secrets
           printf '%s' "$ST_SECRETS_JSON" > secrets/servicetitan.json
@@ -84,6 +86,7 @@ jobs:
           python build/call_board_refresh.py || echo "Call board refresh failed - deploying cached data.json"
           python build/ca_board_refresh.py || echo "CA board refresh failed - deploying cached data.json"
           python build/tech_board_refresh.py || echo "Tech board refresh failed - deploying cached data.json"
+          python build/plumb_board_refresh.py || echo "Plumb board refresh failed - deploying cached data.json"
           rm -rf secrets
 
       - name: Save reports + history for next run
@@ -96,6 +99,7 @@ jobs:
             site/call-board/data.json
             site/ca-board/data.json
             site/tech-board/data.json
+            site/plumb-board/data.json
           key: reports-${{ github.run_id }}
 
       - name: Upload site
