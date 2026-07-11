@@ -14,6 +14,7 @@ workflow can fall back to the last committed data.
 import email
 import imaplib
 import os
+import re
 import socket
 import sys
 
@@ -55,9 +56,9 @@ except imaplib.IMAP4.error:
 msg_ids = ids[0].split()[-LOOKBACK:][::-1]  # newest first
 
 found = {}
-for mid in msg_ids:
-    if len(found) == len(REPORTS):
-        break
+
+
+def _save_from_msg(mid):
     _, raw = M.fetch(mid, "(RFC822)")
     msg = email.message_from_bytes(raw[0][1])
     for part in msg.walk():
@@ -72,6 +73,43 @@ for mid in msg_ids:
                     f.write(part.get_payload(decode=True))
                 found[key] = fn
                 print(f"Saved {out}  <-  '{fn}'  (msg {mid.decode()}, {msg.get('Date','')})")
+
+
+def _fetch_structures(ids):
+    """{msg_id: lowercased BODYSTRUCTURE bytes} - attachment names without
+    downloading any message body, all in one round trip."""
+    if not ids:
+        return {}
+    _, raw = M.fetch(b",".join(ids), "(BODYSTRUCTURE)")
+    out = {}
+    for item in raw:
+        if isinstance(item, tuple):
+            item = b" ".join(p for p in item if isinstance(p, bytes))
+        if not isinstance(item, bytes):
+            continue
+        m = re.match(rb"(\d+) ", item)
+        if m:
+            out[m.group(1)] = item.lower()
+    return out
+
+
+# Download full messages only where the structure shows a matching filename -
+# reading every candidate in full used to cost ~5 minutes per run.
+structures = _fetch_structures(msg_ids)
+for mid in msg_ids:
+    if len(found) == len(REPORTS):
+        break
+    st = structures.get(mid, b"")
+    if any(key.encode() in st for key in REPORTS if key not in found):
+        _save_from_msg(mid)
+
+# Rare encodings can hide the filename from BODYSTRUCTURE - as a last resort
+# read the newest few messages in full like the old scanner did.
+if len(found) < len(REPORTS):
+    for mid in msg_ids[:25]:
+        if len(found) == len(REPORTS):
+            break
+        _save_from_msg(mid)
 
 M.logout()
 
