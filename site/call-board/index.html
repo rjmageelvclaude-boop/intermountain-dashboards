@@ -40,7 +40,6 @@ tr.zebra td:not(.lbl){background:#f3f4f6}
 .lbl.edit:hover::after{content:"✎ default"}
 .dash{color:#999}
 .footer{margin-top:14px;display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:#999;flex-wrap:wrap;gap:6px}
-.fallback-note{margin-top:8px;font-size:12px;font-weight:700;color:#b45309}
 @media(max-width:900px){.big-title{font-size:34px}.co-name{font-size:15px}}
 </style>
 </head>
@@ -147,7 +146,6 @@ function render(){
   var color=CO_COLOR[b.company]||"#24408e";
   document.documentElement.style.setProperty("--co",color);
   document.documentElement.style.setProperty("--tabco",color);
-  var classFallback=b.days.some(function(d){return d.oppSource==="class"});
   var wx=(data.weather||{})[b.company]||null;
 
   var hdr='<tr class="hdr"><th class="lbl">Day</th>'+b.days.map(function(d){
@@ -204,7 +202,6 @@ function render(){
       '<span>Live from ServiceTitan &middot; opportunities = the job\'s Opportunity flag &middot; '+(b.trade==="Plumbing"?"TROPP tag":"ROPP tag")+' minus Management Removed ROPP</span>'+
       '<span>Click a value in Techs Available / Calls Needed / Replacement Opps Needed to edit (PIN) &middot; Updated '+gen+'</span>'+
     '</div>'+
-    (classFallback?'<div class="fallback-note">&#9888; This company\'s ServiceTitan report doesn\'t include the Opportunity column yet, so opportunities are estimated from the job type\'s class. Add the "Opportunity" column to the report to switch to the real per-job flag.</div>':'')+
     (feedError?'<div style="margin-top:8px;font-size:12px;font-weight:700;color:#b91c1c">'+feedError+'</div>':'');
 }
 
