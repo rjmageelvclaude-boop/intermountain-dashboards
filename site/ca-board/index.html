@@ -13,17 +13,21 @@ body{font-family:'Montserrat','Segoe UI',system-ui,sans-serif;background:#e9eaec
 .wrap{max-width:1780px;margin:0 auto;padding:14px 22px 26px}
 /* ── top bar ── */
 .topbar{display:flex;align-items:center;gap:18px;margin-bottom:14px;flex-wrap:wrap}
-.big-title{font-size:50px;font-weight:900;letter-spacing:-1px;text-transform:uppercase;line-height:1;flex-shrink:0}
+.big-title{font-size:44px;font-weight:900;letter-spacing:-1px;text-transform:uppercase;line-height:1;flex-shrink:0}
 .big-title .period{font-size:17px;font-weight:800;color:#666;margin-left:6px;letter-spacing:0}
-.controls{flex:1;display:flex;justify-content:center;align-items:center;gap:16px;font-weight:900;text-transform:uppercase;font-size:16px;letter-spacing:.5px}
+.controls{display:flex;align-items:center;gap:16px;font-weight:900;text-transform:uppercase;font-size:15px;letter-spacing:.5px}
 .ctl{cursor:pointer;user-select:none;color:#111;white-space:nowrap}
 .ctl:hover{color:#1273c8}
 .ctl.dim{color:#b9bdc4}
 .ctl .arr{font-size:18px}
 .sep{color:#c6c9ce;font-weight:700}
-.co-badge{flex-shrink:0;text-align:right}
-.co-name{font-size:21px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:var(--co);line-height:1.1}
-.co-sub{font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:1px}
+/* ── tabs ── */
+.tabwrap{flex:1;display:flex;justify-content:flex-end;align-items:center;gap:14px;flex-wrap:wrap}
+.tabs,.viewtabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab{cursor:pointer;user-select:none;padding:8px 13px;border-radius:8px;font-size:12.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#555;background:#dfe1e5;border:2px solid transparent;white-space:nowrap}
+.tab:hover{color:#111;border-color:#c9ced6}
+.tab.on{background:var(--tabco,#1663c7);color:#fff}
+.viewtabs .tab.on{background:#111}
 /* ── layout ── */
 .board{display:flex;gap:16px;align-items:stretch}
 .feature{width:440px;flex-shrink:0}
@@ -75,16 +79,19 @@ body{font-family:'Montserrat','Segoe UI',system-ui,sans-serif;background:#e9eaec
 <script>
 const DATA_URL="data.json";
 const REFRESH_MINUTES=5;        // re-pull data.json
-const ROTATE_SECONDS=20;        // auto-advance between slides
+const ROTATE_SECONDS=20;        // auto-flip MTD <-> YTD within the selected tab
 const DISC_YELLOW=0.10;         // avg discount >= this shows yellow
 const DISC_RED=0.15;            // ... and >= this shows red
 
-let ORDER=[["sierra","mtd"],["sierra","ytd"],["ultimate","mtd"],["ultimate","ytd"],["russett","mtd"],["russett","ytd"]];
+const BOARD_ORDER=["sierra","ultimate","russett","combined"];
+const COMBINED={label:"Combined",color:"#111827"};
 const PERIOD_LABEL={mtd:"MTD",ytd:"YTD"};
-const IDX_KEY="cab-idx-v1",PAUSE_KEY="cab-pause-v1";
+const BOARD_KEY="cab-board-v2",VIEW_KEY="cab-view-v2",PAUSE_KEY="cab-pause-v1";
 
 let data=null,feedError=null;
-let idx=Math.min(Math.max(parseInt(localStorage.getItem(IDX_KEY)||"0",10)||0,0),ORDER.length-1);
+let curBoard=localStorage.getItem(BOARD_KEY)||"sierra";
+if(!BOARD_ORDER.includes(curBoard))curBoard="sierra";
+let curView=localStorage.getItem(VIEW_KEY)==="ytd"?"ytd":"mtd";
 let paused=localStorage.getItem(PAUSE_KEY)==="1";
 
 const money=n=>"$"+Math.round(n).toLocaleString("en-US");
@@ -120,68 +127,108 @@ function kpisHTML(a){
     <div class="krow"><span>${pct(a.closeRate)}</span><span class="kl">Avg Close Rate</span></div>`;
 }
 
+// Rows for the selected tab: per-company as-is; combined = all companies
+// merged and re-ranked by sales. Each row carries its company color/label
+// so combined cards keep their company identity.
+function boardRows(board,view){
+  if(board!=="combined"){
+    const co=data.companies[board];
+    if(!co)return[];
+    return co.periods[view].advisors.map(a=>({...a,_color:co.color,_dept:a.dept}));
+  }
+  const rows=[];
+  for(const k of BOARD_ORDER){
+    const co=data.companies[k];
+    if(!co)continue;
+    for(const a of co.periods[view].advisors)
+      rows.push({...a,_color:co.color,_dept:co.label});
+  }
+  rows.sort((x,y)=>y.sales-x.sales);
+  return rows;
+}
+
+function tabsHTML(){
+  const coTabs=BOARD_ORDER.map(k=>{
+    const co=k==="combined"?COMBINED:data.companies[k];
+    if(!co)return"";
+    return `<div class="tab ${k===curBoard?"on":""}" style="--tabco:${co.color}" onclick="jumpBoard('${k}')">${esc(co.label)}</div>`;
+  }).join("");
+  const viewTabs=["mtd","ytd"].map(v=>
+    `<div class="tab ${v===curView?"on":""}" onclick="jumpView('${v}')">${PERIOD_LABEL[v]}</div>`).join("");
+  return `<div class="tabwrap"><div class="viewtabs">${viewTabs}</div><div class="tabs">${coTabs}</div></div>`;
+}
+
 function render(){
   const app=document.getElementById("app");
   if(!data){
     if(feedError)app.innerHTML=`<div style="display:flex;justify-content:center;align-items:center;height:80vh;color:#94a3b8;font-weight:600">${esc(feedError)}</div>`;
     return;
   }
-  if(!ORDER.length){app.innerHTML='<div style="display:flex;justify-content:center;align-items:center;height:80vh;color:#94a3b8;font-weight:600">No company data in the feed yet.</div>';return}
-  const [coKey,period]=ORDER[idx];
-  const co=data.companies[coKey];
-  const p=co.periods[period];
-  const advisors=p.advisors;
+  const co=curBoard==="combined"?COMBINED:data.companies[curBoard];
+  if(!co){app.innerHTML='<div style="display:flex;justify-content:center;align-items:center;height:80vh;color:#94a3b8;font-weight:600">No company data in the feed yet.</div>';return}
+  const advisors=boardRows(curBoard,curView);
   const top=advisors[0],rest=advisors.slice(1);
   const gen=data.generatedAt?new Date(data.generatedAt):null;
 
   let html=`
   <div style="--co:${co.color}">
     <div class="topbar">
-      <div class="big-title">${esc(co.label)} - Sales<span class="period">${PERIOD_LABEL[period]}</span></div>
+      <div class="big-title">${esc(co.label)} - Sales<span class="period">${PERIOD_LABEL[curView]}</span></div>
       <div class="controls">
         <span class="ctl" onclick="nav(-1)"><span class="arr">&#8249;</span> Prev</span>
         <span class="ctl" onclick="nav(1)">Next <span class="arr">&#8250;</span></span>
         <span class="sep">|</span>
         <span class="ctl ${paused?"":"dim"}" onclick="togglePause()">${paused?"&#9654; Play":"Pause &#10073;&#10073;"}</span>
       </div>
-      <div class="co-badge"><div class="co-name">${esc(co.label)}</div><div class="co-sub">Comfort Advisors</div></div>
+      ${tabsHTML()}
     </div>`;
 
   if(!advisors.length){
     html+=`<div class="card" style="padding:60px;text-align:center;color:#999;font-weight:700">No active Comfort Advisors found.</div>`;
   }else{
     html+=`<div class="board">
-      <div class="feature"><div class="fcard">
-        <div class="fc-head"><div><div class="fc-name">${esc(top.name)}</div><div class="fc-dept">${esc(top.dept)}</div></div><div class="rankb">#1</div></div>
+      <div class="feature"><div class="fcard" style="--co:${top._color}">
+        <div class="fc-head"><div><div class="fc-name">${esc(top.name)}</div><div class="fc-dept">${esc(top._dept)}</div></div><div class="rankb">#1</div></div>
         <div class="fc-photo">${photoHTML(top,true)}</div>
         <div class="salesbar"><span class="v">${money(top.sales)}</span><span class="l">Sales</span></div>
         ${kpisHTML(top)}
       </div></div>
       <div class="grid">`;
+    let rank=2;
     for(const a of rest){
-      html+=`<div class="card">
-        <div class="c-head"><div><div class="c-name">${esc(a.name)}</div><div class="c-dept">${esc(a.dept)}</div></div><div class="rankb">#${a.rank}</div></div>
+      html+=`<div class="card" style="--co:${a._color}">
+        <div class="c-head"><div><div class="c-name">${esc(a.name)}</div><div class="c-dept">${esc(a._dept)}</div></div><div class="rankb">#${rank}</div></div>
         <div class="salesbar"><span class="v">${money(a.sales)}</span><span class="l">Sales</span></div>
         <div class="c-body">
           <div class="c-photo">${photoHTML(a,false)}</div>
           <div class="c-kpis">${kpisHTML(a)}</div>
         </div>
       </div>`;
+      rank++;
     }
     html+=`</div></div>`;
   }
 
   html+=`<div class="footer">
-    <span>${feedError?`<span class="warn">${esc(feedError)}</span>`:`Sales = sold estimates &middot; Closed Opps = runs with a sold estimate &middot; ${PERIOD_LABEL[period]==="MTD"?"Month":"Year"}-to-date`}</span>
+    <span>${feedError?`<span class="warn">${esc(feedError)}</span>`:`Sales = sold estimates &middot; Closed Opps = runs with a sold estimate &middot; ${PERIOD_LABEL[curView]==="MTD"?"Month":"Year"}-to-date`}</span>
     <span>${gen?"Updated "+gen.toLocaleString():""} &middot; auto-refresh every 15 min</span>
   </div></div>`;
   app.innerHTML=html;
 }
 
-function nav(d){
-  idx=(idx+d+ORDER.length)%ORDER.length;
-  localStorage.setItem(IDX_KEY,idx);
+window.jumpBoard=function(k){
+  curBoard=k;
+  localStorage.setItem(BOARD_KEY,k);
   render();
+};
+window.jumpView=function(v){
+  curView=v;
+  localStorage.setItem(VIEW_KEY,v);
+  render();
+};
+// Prev/Next (and auto-rotate) flip MTD <-> YTD, staying on the selected tab.
+function nav(){
+  jumpView(curView==="mtd"?"ytd":"mtd");
 }
 function togglePause(){
   paused=!paused;
@@ -195,9 +242,9 @@ async function fetchData(){
     const r=await fetch(DATA_URL+"?t="+Date.now(),{cache:"no-store"});
     if(!r.ok)throw new Error("HTTP "+r.status);
     data=await r.json();feedError=null;
-    ORDER=["sierra","ultimate","russett"].filter(k=>data.companies&&data.companies[k])
-          .flatMap(k=>[[k,"mtd"],[k,"ytd"]]);
-    if(idx>=ORDER.length)idx=0;
+    if(curBoard!=="combined"&&!(data.companies&&data.companies[curBoard])){
+      curBoard=Object.keys(data.companies||{})[0]||"combined";
+    }
   }catch(e){
     console.error(e);
     feedError=data?"Data feed temporarily unavailable - showing the last good pull.":"Data feed unavailable - try again in a minute.";
