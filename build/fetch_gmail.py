@@ -14,7 +14,12 @@ workflow can fall back to the last committed data.
 import email
 import imaplib
 import os
+import socket
 import sys
+
+# A stalled IMAP connection must fail, not hang - a hung fetch once blocked the
+# whole refresh pipeline for hours.
+socket.setdefaulttimeout(60)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(os.path.dirname(HERE), "data")

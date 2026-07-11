@@ -12,16 +12,17 @@ permissions:
   pages: write
   id-token: write
 
-# Never cancel a running refresh - runs can exceed the 10-min dispatch interval,
-# and cancelling in progress meant no run ever finished. GitHub keeps at most one
-# pending run per group, so newer dispatches still replace the queued one.
+# Newer runs replace older ones. Every step below carries a hard timeout so a
+# normal run finishes well inside the 10-minute dispatch interval - a run only
+# gets cancelled mid-flight if it is already hung past its timeouts.
 concurrency:
   group: pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -47,6 +48,8 @@ jobs:
 
       # ---- Contest dashboard (still fed by emailed reports) ----
       - name: Fetch newest reports from Gmail
+        timeout-minutes: 5
+        continue-on-error: true
         env:
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
@@ -63,6 +66,8 @@ jobs:
 
       # ---- Command Center + 4 Day Call board (live from the ServiceTitan API) ----
       - name: Command Center -> site/command-center/data.json
+        timeout-minutes: 8
+        continue-on-error: true
         env:
           ST_SECRETS_JSON: ${{ secrets.ST_SECRETS_JSON }}
           ST_TIMEOUT: "120"
