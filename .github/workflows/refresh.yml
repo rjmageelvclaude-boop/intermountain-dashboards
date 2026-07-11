@@ -22,7 +22,7 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 20
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -68,11 +68,15 @@ jobs:
 
       # ---- Command Center + 4 Day Call board (live from the ServiceTitan API) ----
       - name: Command Center -> site/command-center/data.json
-        timeout-minutes: 16
+        timeout-minutes: 8
         continue-on-error: true
         env:
           ST_SECRETS_JSON: ${{ secrets.ST_SECRETS_JSON }}
           ST_TIMEOUT: "120"
+          # Keep the whole run inside the 10-minute dispatch interval: closed-month
+          # YTD backfill does at most this many seconds per run and resumes from the
+          # cached data/tech-board-history.json on the next run.
+          TECH_BOARD_BUDGET: "90"
         run: |
           mkdir -p secrets
           printf '%s' "$ST_SECRETS_JSON" > secrets/servicetitan.json
