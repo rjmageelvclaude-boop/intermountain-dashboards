@@ -12,12 +12,13 @@ permissions:
   pages: write
   id-token: write
 
-# Newer runs replace older ones. Every step below carries a hard timeout so a
-# normal run finishes well inside the 10-minute dispatch interval - a run only
-# gets cancelled mid-flight if it is already hung past its timeouts.
+# Never cancel a run that is already building: with five boards a full run can
+# outlast the dispatch interval, and a cancelled run never reaches the deploy
+# step (the site silently stops updating). New dispatches queue behind the
+# active run; GitHub keeps at most one queued and drops the rest.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build-and-deploy:
@@ -69,14 +70,13 @@ jobs:
 
       # ---- Command Center + 4 Day Call board (live from the ServiceTitan API) ----
       - name: Command Center -> site/command-center/data.json
-        timeout-minutes: 8
+        timeout-minutes: 12
         continue-on-error: true
         env:
           ST_SECRETS_JSON: ${{ secrets.ST_SECRETS_JSON }}
           ST_TIMEOUT: "120"
-          # Keep the whole run inside the 10-minute dispatch interval: closed-month
-          # YTD backfill does at most this many seconds per run and resumes from the
-          # cached data/tech-board-history.json on the next run.
+          # Bound each board's closed-month YTD backfill: at most this many seconds
+          # per run, resuming from the cached history file on the next run.
           TECH_BOARD_BUDGET: "90"
           PLUMB_BOARD_BUDGET: "90"
         run: |
