@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Silo Leaderboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Montserrat','Segoe UI',system-ui,sans-serif;background:#f2f3f5;color:#111;min-height:100vh}
+.wrap{max-width:1720px;margin:0 auto;padding:14px 22px 24px}
+.topbar{display:flex;align-items:center;gap:16px;margin-bottom:12px;flex-wrap:wrap}
+.big-title{font-size:44px;font-weight:900;letter-spacing:-1px;text-transform:uppercase;line-height:1;white-space:nowrap}
+.big-title .view{font-size:16px;font-weight:800;color:#888;margin-left:8px;letter-spacing:0}
+.nav{flex:1;display:flex;justify-content:center;align-items:center;gap:14px;font-weight:800;font-size:14px;letter-spacing:.5px;flex-wrap:wrap}
+.nav .pg{color:#555;white-space:nowrap}
+.nav button{border:0;background:none;font:inherit;font-weight:800;cursor:pointer;color:#111;text-transform:uppercase;letter-spacing:.5px;padding:6px 8px;border-radius:6px}
+.nav button:hover{background:#e5e7eb}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.tab{cursor:pointer;user-select:none;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#555;background:#e7e9ec;border:2px solid transparent;white-space:nowrap}
+.tab:hover{color:#111;border-color:#c9ced6}
+.tab.on{background:var(--tabco,#1663c7);color:#fff}
+.viewtabs{display:flex;gap:6px}
+.viewtabs .tab.on{background:#111}
+
+.grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:14px}
+.grid.no-featured{grid-template-columns:repeat(4,1fr)}
+.featured{grid-row:span 3;display:flex;flex-direction:column;background:#fff;border-radius:12px;padding:18px 20px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.f-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.f-name{font-size:30px;font-weight:900;text-transform:uppercase;line-height:1.05;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.f-team{font-size:13px;font-weight:700;color:#888;margin-top:4px}
+.f-photo{flex:1;min-height:180px;margin:14px 0 0;border-radius:10px;overflow:hidden;background:#dfe3e8;position:relative}
+.f-photo img{width:100%;height:100%;object-fit:cover;object-position:center 20%;position:absolute;inset:0}
+.rank{background:var(--co,#1663c7);color:#fff;font-weight:900;border-radius:8px;padding:8px 14px;font-size:20px;white-space:nowrap}
+.revbar{display:flex;justify-content:space-between;align-items:center;background:var(--co,#1663c7);color:#fff;border-radius:8px;padding:10px 16px;margin-top:14px}
+.revbar .amt{font-size:26px;font-weight:900}
+.revbar .lbl{font-size:15px;font-weight:800}
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:12px}
+.stat{background:#f5f6f8;border-radius:8px;padding:9px 6px;text-align:center}
+.stat .v{font-size:17px;font-weight:900;line-height:1.1}
+.stat .k{font-size:9.5px;font-weight:800;color:#8a919c;text-transform:uppercase;letter-spacing:.03em;margin-top:3px;line-height:1.15}
+.featured .stat{padding:14px 6px}
+.featured .stat .v{font-size:23px}
+.featured .stat .k{font-size:11px}
+
+.card{background:#fff;border-radius:12px;padding:13px 15px;box-shadow:0 1px 4px rgba(0,0,0,.08);display:flex;flex-direction:column}
+.c-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.c-name{font-size:16.5px;font-weight:900;text-transform:uppercase;line-height:1.1;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical}
+.c-team{font-size:10.5px;font-weight:700;color:#999;margin-top:2px}
+.card .rank{font-size:13px;padding:5px 9px;border-radius:6px}
+.card .revbar{padding:6px 12px;margin-top:8px}
+.card .revbar .amt{font-size:16.5px}
+.card .revbar .lbl{font-size:11px}
+.c-body{display:flex;gap:10px;margin-top:9px;flex:1}
+.c-photo{width:37%;min-height:118px;border-radius:8px;overflow:hidden;background:#dfe3e8;position:relative;flex-shrink:0}
+.c-photo img{width:100%;height:100%;object-fit:cover;object-position:center 20%;position:absolute;inset:0}
+.c-body .stats{flex:1;margin-top:0;gap:5px}
+.c-body .stat{padding:5px 3px;display:flex;flex-direction:column;justify-content:center}
+.c-body .stat .v{font-size:13px}
+.c-body .stat .k{font-size:8px;margin-top:2px}
+.initials{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:900;color:#fff;background:linear-gradient(135deg,var(--co,#1663c7),#111827);font-size:34px}
+.c-photo .initials{font-size:26px}
+
+.footer{margin-top:12px;display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:#999;flex-wrap:wrap;gap:6px}
+.warn{color:#b45309}
+.empty{padding:80px 0;text-align:center;font-size:20px;font-weight:800;color:#999}
+@media(max-width:1200px){.grid{grid-template-columns:1fr 1fr}.featured{grid-row:span 2}}
+@media(max-width:700px){.grid{grid-template-columns:1fr}.featured{grid-row:auto}.big-title{font-size:30px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="big-title"><span id="t-co">SILO</span><span class="view" id="t-view">MTD</span></div>
+    <div class="nav">
+      <span class="pg" id="pg">1 of 1</span>
+      <button id="prev">&lt; Prev</button>
+      <button id="next">Next &gt;</button>
+      <span style="color:#ccc">|</span>
+      <button id="pause">Pause</button>
+    </div>
+    <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+      <div class="viewtabs" id="viewtabs"></div>
+      <div class="tabs" id="tabs"></div>
+    </div>
+  </div>
+  <div id="board"></div>
+  <div class="footer">
+    <span id="updated"></span>
+    <span id="note"></span>
+  </div>
+</div>
+<script>
+"use strict";
+const ROTATE_SECS = 12, RELOAD_MINS = 5;
+const BOARD_ORDER = ["sierra", "ultimate", "russett", "combined"];
+const COMBINED = {label: "Combined", color: "#111827"};
+let DATA = null, paused = false, timer = null;
+// rotation stays on the selected board+view, cycling its pages only
+let curView = "mtd", curBoard = "sierra", curPage = 0;
+
+const $ = id => document.getElementById(id);
+const money = v => "$" + Math.round(v).toLocaleString("en-US");
+const pct = v => Math.round(v) + "%";
+
+const pct1 = v => (Math.round(v * 10) / 10) + "%";
+const STATS = r => [
+  [r.tgls, "TGLs Created"], [pct1(r.flipRate), "Same-Day Flip"], [pct1(r.flipRateND), "Flip +Next Day"],
+  [r.membSold, "Mem Sold"], [pct(r.membConv), "Mem Conv"], [pct(r.membOffered), "Mem Offered"],
+  [pct(r.tglRate), "TGL Rate"], [r.jobs, "Jobs Ran"], [money(r.revenue), "Revenue"],
+];
+
+function photoHtml(r, cls) {
+  const initials = r.name.split(/\s+/).map(w => w[0]).slice(0, 2).join("").toUpperCase();
+  return `<div class="${cls}" style="--co:${r.color}">
+    <div class="initials">${initials}</div>
+    <img src="photos/${r.company}-${r.id}.jpg" alt="" loading="lazy"
+         onerror="this.remove()"></div>`;
+}
+
+function statsHtml(r) {
+  return `<div class="stats">` + STATS(r).map(([v, k]) =>
+    `<div class="stat"><div class="v">${v}</div><div class="k">${k}</div></div>`).join("") + `</div>`;
+}
+
+function featuredHtml(r, rank) {
+  return `<div class="featured" style="--co:${r.color}">
+    <div class="f-head"><div><div class="f-name">${r.name}</div>
+      <div class="f-team">${r.companyLabel}</div></div>
+      <div class="rank">#${rank}</div></div>
+    ${photoHtml(r, "f-photo")}
+    <div class="revbar"><span class="amt">${money(r.tglSales)}</span><span class="lbl">TGL Sales</span></div>
+    ${statsHtml(r)}</div>`;
+}
+
+function cardHtml(r, rank) {
+  return `<div class="card" style="--co:${r.color}">
+    <div class="c-head"><div><div class="c-name">${r.name}</div>
+      <div class="c-team">${r.companyLabel}</div></div>
+      <div class="rank">#${rank}</div></div>
+    <div class="revbar"><span class="amt">${money(r.tglSales)}</span><span class="lbl">TGL Sales</span></div>
+    <div class="c-body">${photoHtml(r, "c-photo")}${statsHtml(r)}</div></div>`;
+}
+
+function boardRows(board, view) {
+  return (DATA.boards[view][board] || []).filter(r => r.tgls || r.tglSales || r.jobs);
+}
+
+function pageCount(board, view) {
+  const n = boardRows(board, view).length;
+  return n ? 1 + Math.ceil(Math.max(0, n - 10) / 12) : 1;
+}
+
+function render() {
+  if (!DATA) { $("board").innerHTML = `<div class="empty">Waiting for data…</div>`; return; }
+  const co = curBoard === "combined" ? COMBINED : DATA.companies[curBoard];
+  const rows = boardRows(curBoard, curView);
+  const n = pageCount(curBoard, curView);
+  curPage = Math.min(curPage, n - 1);
+  $("t-co").textContent = co.label.toUpperCase() + " – SILO";
+  $("t-view").textContent = curView.toUpperCase() + " · " + DATA.period[curView];
+  $("pg").textContent = (curPage + 1) + " of " + n;
+
+  let html;
+  if (!rows.length) {
+    html = `<div class="empty">No activity yet</div>`;
+  } else if (curPage === 0) {
+    const chunk = rows.slice(0, 10);
+    html = `<div class="grid">` + featuredHtml(chunk[0], 1) +
+      chunk.slice(1).map((r, i) => cardHtml(r, i + 2)).join("") + `</div>`;
+  } else {
+    const start = 10 + (curPage - 1) * 12;
+    const chunk = rows.slice(start, start + 12);
+    html = `<div class="grid no-featured">` +
+      chunk.map((r, i) => cardHtml(r, start + i + 1)).join("") + `</div>`;
+  }
+  $("board").innerHTML = html;
+  document.querySelectorAll("#tabs .tab").forEach(t =>
+    t.classList.toggle("on", t.dataset.board === curBoard));
+  document.querySelectorAll("#viewtabs .tab").forEach(t =>
+    t.classList.toggle("on", t.dataset.view === curView));
+  $("updated").textContent = "Updated " + DATA.updated + " (live ServiceTitan API)";
+  $("note").textContent = DATA.complete ? "" : "Year-to-date backfill in progress — YTD totals will finish within the hour.";
+  $("note").className = DATA.complete ? "" : "warn";
+}
+
+function step(d) {
+  const n = pageCount(curBoard, curView);
+  curPage = (curPage + d + n) % n;
+  render();
+}
+function jump(board, view) {
+  curBoard = board; curView = view; curPage = 0;
+  render();
+}
+
+function buildTabs() {
+  $("tabs").innerHTML = BOARD_ORDER.map(b => {
+    const co = b === "combined" ? COMBINED : DATA.companies[b];
+    return `<div class="tab" data-board="${b}" style="--tabco:${co.color}">${co.label}</div>`;
+  }).join("");
+  document.querySelectorAll("#tabs .tab").forEach(t =>
+    t.onclick = () => jump(t.dataset.board, curView));
+  $("viewtabs").innerHTML = ["mtd", "ytd"].map(v =>
+    `<div class="tab" data-view="${v}">${v.toUpperCase()}</div>`).join("");
+  document.querySelectorAll("#viewtabs .tab").forEach(t =>
+    t.onclick = () => jump(curBoard, t.dataset.view));
+}
+
+async function load() {
+  try {
+    const r = await fetch("data.json?" + Date.now());
+    if (!r.ok) throw new Error(r.status);
+    DATA = await r.json();
+    buildTabs();
+    render();
+  } catch (e) {
+    if (!DATA) $("board").innerHTML = `<div class="empty">Could not load data.json (${e.message})</div>`;
+  }
+}
+
+$("prev").onclick = () => step(-1);
+$("next").onclick = () => step(1);
+$("pause").onclick = () => {
+  paused = !paused;
+  $("pause").textContent = paused ? "Play" : "Pause";
+};
+timer = setInterval(() => {
+  if (!paused && DATA && pageCount(curBoard, curView) > 1) step(1);
+}, ROTATE_SECS * 1000);
+setInterval(load, RELOAD_MINS * 60 * 1000);
+load();
+</script>
+</body>
+</html>
