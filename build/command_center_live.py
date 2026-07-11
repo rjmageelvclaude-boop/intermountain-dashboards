@@ -54,6 +54,17 @@ COMPANIES = {
         },
         "costco_bu": [340802904],
         "ropp_tags": [962027],
+        # Water-heater/filtration units counted by price-book code on estimates
+        # SOLD that day (RJ 2026-07-10). Companies without this fall back to
+        # counting completed jobs whose job-type name looks like an install.
+        "wh_skus": {
+            "tankless": ["WHNAVI01", "WHN10", "WHN02", "WHN03", "WHESS01", "WHTRU01"],
+            "filtration": ["WT07", "WD01", "WTF02", "WT30", "WT11", "WT03",
+                           "WT04", "WT02", "WT05", "WT01"],
+            "tanks": ["WHB04", "WHB05", "WHB01", "WHB09", "WHBW01", "WHB07",
+                      "WHB13", "WHB08", "WHB06", "WHB02", "WHB10", "WHBW02",
+                      "WHB03", "WHB11", "WHW03"],
+        },
         "plumb": True, "costco": True,
     },
     "ultimate": {
@@ -266,17 +277,6 @@ def compute_day(company, day, jt_names=None):
     m["tglsSet"] = len(tgl_created)
     m["tglsSetSameDay"] = sum(1 for j in tgl_created if j["id"] in jobs_by_id)
 
-    # plumbing big-ticket installs completed today
-    wh = {"tankless": 0, "filtration": 0, "tanks": 0}
-    for j in board:
-        if ran(j):
-            cat = _wh_category(j["_jt_name"])
-            if cat:
-                wh[cat] += 1
-    m["plumbTanklessSold"] = wh["tankless"]
-    m["plumbFiltrationSold"] = wh["filtration"]
-    m["plumbTanksSold"] = wh["tanks"]
-
     # -- estimates sold today
     estimates = fetch_all(tenant, "/sales/v2/tenant/{tenant}/estimates",
                           {"soldAfter": start, "soldBefore": end})
@@ -302,6 +302,27 @@ def compute_day(company, day, jt_names=None):
             cat = _sales_category(co, job)
             cat_sales[cat] += amt
             cat_sold_jobs[cat].add(job["id"])
+
+    # plumbing big-ticket units: by price-book code on today's SOLD estimates
+    # where configured (Sierra); otherwise completed install-type jobs.
+    wh = {"tankless": 0.0, "filtration": 0.0, "tanks": 0.0}
+    wh_skus = co.get("wh_skus")
+    if wh_skus:
+        sku_cat = {code: c for c, codes in wh_skus.items() for code in codes}
+        for e in estimates:
+            for it in (e.get("items") or []):
+                c = sku_cat.get(((it.get("sku") or {}).get("name") or "").strip())
+                if c:
+                    wh[c] += float(it.get("qty") or 1)
+    else:
+        for j in board:
+            if ran(j):
+                cat = _wh_category(j["_jt_name"])
+                if cat:
+                    wh[cat] += 1
+    m["plumbTanklessSold"] = int(round(wh["tankless"]))
+    m["plumbFiltrationSold"] = int(round(wh["filtration"]))
+    m["plumbTanksSold"] = int(round(wh["tanks"]))
 
     m["dailySales"] = round(daily_sales, 2)
     m["hvacServiceSales"] = round(hvac_service_sales, 2)
