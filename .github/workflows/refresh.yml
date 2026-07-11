@@ -49,6 +49,7 @@ jobs:
             site/plumb-board/data.json
             site/csr-board/data.json
             site/install-board/data.json
+            site/goat-board/data.json
           key: reports-${{ github.run_id }}
           restore-keys: reports-
 
@@ -83,6 +84,7 @@ jobs:
           PLUMB_BOARD_BUDGET: "90"
           CSR_BOARD_BUDGET: "90"
           INSTALL_BOARD_BUDGET: "120"
+          GOAT_BOARD_BUDGET: "90"
         run: |
           mkdir -p secrets
           printf '%s' "$ST_SECRETS_JSON" > secrets/servicetitan.json
@@ -93,6 +95,8 @@ jobs:
           python build/plumb_board_refresh.py || echo "Plumb board refresh failed - deploying cached data.json"
           python build/csr_board_refresh.py || echo "CSR board refresh failed - deploying cached data.json"
           python build/install_board_refresh.py || echo "Install board refresh failed - deploying cached data.json"
+          # GOAT board reads the other boards' data.json - keep it last
+          python build/goat_board_refresh.py || echo "GOAT board refresh failed - deploying cached data.json"
           rm -rf secrets
 
       - name: Save reports + history for next run
@@ -108,6 +112,7 @@ jobs:
             site/plumb-board/data.json
             site/csr-board/data.json
             site/install-board/data.json
+            site/goat-board/data.json
           key: reports-${{ github.run_id }}
 
       - name: Upload site

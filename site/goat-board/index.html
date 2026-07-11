@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>GOAT Group Trip Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Montserrat','Segoe UI',system-ui,sans-serif;background:#e9eaec;color:#111;min-height:100vh}
+.wrap{max-width:1780px;margin:0 auto;padding:14px 22px 26px}
+/* ── top bar ── */
+.topbar{display:flex;align-items:center;gap:18px;margin-bottom:14px;flex-wrap:wrap}
+.big-title{font-size:40px;font-weight:900;letter-spacing:-1px;text-transform:uppercase;line-height:1;flex-shrink:0}
+.big-title .goatmark{color:#b8860b}
+.big-title .period{font-size:17px;font-weight:800;color:#666;margin-left:8px;letter-spacing:0}
+.goalchip{background:#111;color:#f5c542;border-radius:8px;padding:8px 14px;font-size:15px;font-weight:900;letter-spacing:.5px;white-space:nowrap}
+.controls{display:flex;align-items:center;gap:16px;font-weight:900;text-transform:uppercase;font-size:15px;letter-spacing:.5px}
+.ctl{cursor:pointer;user-select:none;color:#111;white-space:nowrap}
+.ctl:hover{color:#b8860b}
+.ctl.dim{color:#b9bdc4}
+.ctl .arr{font-size:18px}
+.sep{color:#c6c9ce;font-weight:700}
+.tabwrap{flex:1;display:flex;justify-content:flex-end;align-items:center;gap:14px;flex-wrap:wrap}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab{cursor:pointer;user-select:none;padding:8px 13px;border-radius:8px;font-size:12.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#555;background:#dfe1e5;border:2px solid transparent;white-space:nowrap}
+.tab:hover{color:#111;border-color:#c9ced6}
+.tab.on{background:#111;color:#f5c542}
+/* ── person rows ── */
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:10px 14px;align-content:start}
+.prow{background:#fff;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:10px 14px 9px}
+.pr-top{display:flex;align-items:baseline;gap:8px;margin-bottom:6px}
+.rank{font-size:12px;font-weight:900;color:#fff;background:#9aa0a8;border-radius:5px;padding:2px 7px;flex-shrink:0}
+.prow.done .rank{background:#b8860b}
+.prow.ahead .rank{background:#27a54a}
+.pname{font-size:16px;font-weight:900;letter-spacing:-.2px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip{display:inline-block;color:#fff;font-size:10px;font-weight:900;border-radius:4px;padding:1.5px 6px;vertical-align:2px;margin-left:6px;letter-spacing:.5px}
+.pamt{font-size:16px;font-weight:900;flex-shrink:0}
+/* ── pacing strip (shared with the CA board look) ── */
+.goat-track{position:relative;height:10px;border-radius:5px;background:#e2e4e8;overflow:visible}
+.goat-fill{height:100%;border-radius:5px;background:#eab308;min-width:2px}
+.prow.ahead .goat-fill,.scard .mini.ahead .goat-fill{background:#27a54a}
+.prow.done .goat-fill,.scard .mini.done .goat-fill{background:linear-gradient(90deg,#d4a017,#f5c542)}
+.goat-tick{position:absolute;top:-3px;bottom:-3px;width:3px;background:#111;border-radius:2px}
+.pr-sub{display:flex;justify-content:space-between;margin-top:4px;font-size:11px;font-weight:800;color:#8a8f98;text-transform:uppercase;letter-spacing:.4px}
+.pr-sub .st{color:#b45309}
+.prow.ahead .pr-sub .st{color:#1d7f38}
+.prow.done .pr-sub .st{color:#b8860b}
+/* dense mode for big departments */
+.pgrid.dense{grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:7px 10px}
+.pgrid.dense .prow{padding:7px 11px 6px}
+.pgrid.dense .pname{font-size:13.5px}
+.pgrid.dense .pamt{font-size:13.5px}
+.pgrid.dense .goat-track{height:8px}
+.pgrid.dense .pr-sub{font-size:10px;margin-top:3px}
+.pgrid.dense .pr-top{margin-bottom:4px}
+.pgrid.dense .rank{font-size:10.5px;padding:1.5px 6px}
+/* ── summary slide ── */
+.sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(390px,1fr));gap:14px;align-content:start}
+.scard{background:#fff;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:16px 18px;cursor:pointer}
+.scard:hover{box-shadow:0 2px 10px rgba(0,0,0,.16)}
+.sc-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:10px}
+.sc-name{font-size:20px;font-weight:900;letter-spacing:-.3px}
+.sc-goal{font-size:12.5px;font-weight:800;color:#8a8f98;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}
+.sc-stats{display:flex;gap:8px;margin-bottom:12px}
+.stat{flex:1;background:#f2f3f5;border-radius:5px;padding:8px 6px;text-align:center}
+.stat .v{font-size:22px;font-weight:900;line-height:1.1}
+.stat .l{font-size:10px;font-weight:800;color:#8a8f98;text-transform:uppercase;letter-spacing:.4px;margin-top:2px}
+.stat.q .v{color:#b8860b}
+.stat.a .v{color:#1d7f38}
+.mini .mrow{display:flex;justify-content:space-between;font-size:12.5px;font-weight:800;margin-bottom:4px}
+.mini .mrow .who{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;padding-right:8px}
+.mini .goat-track{height:8px}
+.pend{font-size:13px;font-weight:700;color:#8a8f98;line-height:1.5;padding:8px 0}
+.note{background:#fff;border-left:4px solid #eab308;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:10px 14px;font-size:12.5px;font-weight:700;color:#666;margin-bottom:12px}
+.footer{margin-top:14px;display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:#999;flex-wrap:wrap;gap:6px}
+.warn{color:#b45309}
+@media(max-width:760px){.big-title{font-size:28px}.pgrid,.pgrid.dense{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+<div style="display:flex;justify-content:center;align-items:center;height:80vh;color:#94a3b8"><div style="text-align:center"><div style="font-size:32px;margin-bottom:12px">&#128016;</div><div style="font-size:14px;font-weight:600">Loading GOAT Group Tracker...</div></div></div>
+</div>
+<script>
+const DATA_URL="data.json";
+const REFRESH_MINUTES=5;        // re-pull data.json
+const ROTATE_SECONDS=20;        // auto-advance to the next department
+const DENSE_AT=28;              // switch to compact rows above this many people
+
+const SLIDE_KEY="goat-slide-v1",PAUSE_KEY="goat-pause-v1";
+let data=null,feedError=null;
+let curSlide=localStorage.getItem(SLIDE_KEY)||"summary";
+let paused=localStorage.getItem(PAUSE_KEY)==="1";
+
+const money=n=>"$"+Math.round(n).toLocaleString("en-US");
+const moneyM=n=>n>=1e6?"$"+(n/1e6).toFixed(n>=1e7?0:2).replace(/0+$/,"").replace(/\.$/,"")+"M":n>=1000?"$"+Math.round(n/1000)+"K":"$"+Math.round(n);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+// slides = summary + every department that has (or will have) people
+function slideList(){
+  return ["summary",...data.departments.filter(d=>!d.pending).map(d=>d.key)];
+}
+function dept(key){return data.departments.find(d=>d.key===key)}
+
+// pace math shared with the CA board strip: where "today" sits in the year
+function pace(){
+  const now=data.generatedAt?new Date(data.generatedAt):new Date();
+  const y=data.year||now.getFullYear();
+  const dayOfYear=Math.max(1,Math.floor((now-new Date(y,0,1))/864e5)+1);
+  const daysInYear=(y%4===0&&(y%100!==0||y%400===0))?366:365;
+  return{dayOfYear,daysInYear,frac:Math.min(dayOfYear/daysInYear,1)};
+}
+function personStats(p,goal){
+  const pc=pace();
+  const frac=goal?p.amount/goal:0;
+  const proj=p.amount/pc.dayOfYear*pc.daysInYear;
+  const cls=frac>=1?"done":frac>=pc.frac?"ahead":"";
+  const status=frac>=1?"&#128016; QUALIFIED":frac>=pc.frac?"Ahead of pace":"Behind pace";
+  return{frac,proj,cls,status,paceFrac:pc.frac};
+}
+function trackHTML(frac,paceFrac){
+  return `<div class="goat-track"><div class="goat-fill" style="width:${Math.min(frac,1)*100}%"></div><div class="goat-tick" style="left:${paceFrac*100}%"></div></div>`;
+}
+
+function personHTML(p,rank,goal){
+  const s=personStats(p,goal);
+  return `<div class="prow ${s.cls}">
+    <div class="pr-top">
+      <span class="rank">#${rank}</span>
+      <span class="pname">${esc(p.name)}<span class="chip" style="background:${p.color}">${esc(p.companyCode||"")}</span></span>
+      <span class="pamt">${money(p.amount)}</span>
+    </div>
+    ${trackHTML(s.frac,s.paceFrac)}
+    <div class="pr-sub"><span>${Math.round(s.frac*100)}% of ${moneyM(goal)}</span><span class="st">${s.status} &middot; proj ${moneyM(s.proj)}</span></div>
+  </div>`;
+}
+
+function deptSlideHTML(d){
+  if(d.missing)return `<div class="note">Waiting for the ${esc(d.source)} feed - this department fills in on the next refresh.</div>`;
+  if(!d.people.length)return `<div class="note">No one on this department's teams yet.</div>`;
+  let html=d.note?`<div class="note">${esc(d.note)}</div>`:"";
+  html+=`<div class="pgrid ${d.people.length>DENSE_AT?"dense":""}">`;
+  d.people.forEach((p,i)=>{html+=personHTML(p,i+1,d.goal)});
+  return html+"</div>";
+}
+
+function summaryHTML(){
+  const pc=pace();
+  let html=`<div class="sgrid">`;
+  for(const d of data.departments){
+    if(d.pending){
+      html+=`<div class="scard" onclick="void(0)">
+        <div class="sc-head"><div class="sc-name">${esc(d.label)}</div><div class="sc-goal">${esc(d.metric)}</div></div>
+        <div class="pend">${esc(d.note||"Coming soon.")}</div>
+      </div>`;
+      continue;
+    }
+    const qual=d.people.filter(p=>p.amount>=d.goal).length;
+    const ahead=d.people.filter(p=>p.amount<d.goal&&p.amount/d.goal>=pc.frac).length;
+    const top=d.people[0];
+    let mini="";
+    if(top){
+      const s=personStats(top,d.goal);
+      mini=`<div class="mini ${s.cls}">
+        <div class="mrow"><span class="who">Leader: ${esc(top.name)} (${esc(top.companyCode)})</span><span>${money(top.amount)} &middot; ${Math.round(s.frac*100)}%</span></div>
+        <div class="${s.cls}">${trackHTML(s.frac,s.paceFrac)}</div>
+      </div>`;
+    }else if(d.missing){
+      mini=`<div class="pend">Waiting for the ${esc(d.source)} feed.</div>`;
+    }
+    html+=`<div class="scard" onclick="jumpSlide('${d.key}')">
+      <div class="sc-head"><div class="sc-name">${esc(d.label)}</div><div class="sc-goal">${moneyM(d.goal)} ${esc(d.metric.replace(/^YTD /,""))}</div></div>
+      <div class="sc-stats">
+        <div class="stat q"><div class="v">${qual}</div><div class="l">&#128016; Qualified</div></div>
+        <div class="stat a"><div class="v">${ahead}</div><div class="l">Ahead of pace</div></div>
+        <div class="stat"><div class="v">${d.people.length}</div><div class="l">Tracking</div></div>
+      </div>
+      ${mini}
+    </div>`;
+  }
+  return html+"</div>";
+}
+
+function tabsHTML(){
+  const tabs=slideList().map(k=>{
+    const label=k==="summary"?"Overview":dept(k).label;
+    return `<div class="tab ${k===curSlide?"on":""}" onclick="jumpSlide('${k}')">${esc(label)}</div>`;
+  }).join("");
+  return `<div class="tabwrap"><div class="tabs">${tabs}</div></div>`;
+}
+
+function render(){
+  const app=document.getElementById("app");
+  if(!data){
+    if(feedError)app.innerHTML=`<div style="display:flex;justify-content:center;align-items:center;height:80vh;color:#94a3b8;font-weight:600">${esc(feedError)}</div>`;
+    return;
+  }
+  if(!slideList().includes(curSlide))curSlide="summary";
+  const d=curSlide==="summary"?null:dept(curSlide);
+  const pc=pace();
+  const gen=data.generatedAt?new Date(data.generatedAt):null;
+
+  let html=`
+    <div class="topbar">
+      <div class="big-title"><span class="goatmark">&#128016;</span> GOAT Group<span class="period">${data.year} &middot; ${d?esc(d.label):"Overview"}</span></div>
+      ${d&&d.goal?`<div class="goalchip">GOAL ${moneyM(d.goal)} &middot; ${esc(d.metric)}</div>`:""}
+      <div class="controls">
+        <span class="ctl" onclick="nav(-1)"><span class="arr">&#8249;</span> Prev</span>
+        <span class="ctl" onclick="nav(1)">Next <span class="arr">&#8250;</span></span>
+        <span class="sep">|</span>
+        <span class="ctl ${paused?"":"dim"}" onclick="togglePause()">${paused?"&#9654; Play":"Pause &#10073;&#10073;"}</span>
+      </div>
+      ${tabsHTML()}
+    </div>`;
+
+  html+=d?deptSlideHTML(d):summaryHTML();
+
+  html+=`<div class="footer">
+    <span>${feedError?`<span class="warn">${esc(feedError)}</span>`:`Day ${pc.dayOfYear} of ${pc.daysInYear} &middot; black tick = today's pace &middot; qualify by hitting the year goal${data.complete===false?' &middot; <span class="warn">history backfill in progress - numbers may be partial</span>':""}`}</span>
+    <span>${gen?"Updated "+gen.toLocaleString():""} &middot; auto-refresh every 15 min</span>
+  </div>`;
+  app.innerHTML=html;
+}
+
+window.jumpSlide=function(k){
+  curSlide=k;
+  localStorage.setItem(SLIDE_KEY,k);
+  render();
+};
+function nav(dir){
+  const list=slideList();
+  const i=list.indexOf(curSlide);
+  jumpSlide(list[(i+dir+list.length)%list.length]);
+}
+function togglePause(){
+  paused=!paused;
+  localStorage.setItem(PAUSE_KEY,paused?"1":"0");
+  render();
+}
+setInterval(function(){if(!paused&&data)nav(1)},ROTATE_SECONDS*1000);
+
+async function fetchData(){
+  try{
+    const r=await fetch(DATA_URL+"?t="+Date.now(),{cache:"no-store"});
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    data=await r.json();feedError=null;
+  }catch(e){
+    console.error(e);
+    feedError=data?"Data feed temporarily unavailable - showing the last good pull.":"Data feed unavailable - try again in a minute.";
+  }
+}
+async function refresh(){await fetchData();render()}
+
+// ── access gate (hosted mode only; same code as the Command Center) ──
+const ACCESS_HASH="a317cc2a63bdef8b314787da505ec86458118b1d9f87d95a6b3fa4272a582e16";
+const ACCESS_KEY="cc-access-v1";
+async function sha256hex(s){
+  var b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));
+  return[...new Uint8Array(b)].map(function(x){return x.toString(16).padStart(2,"0")}).join("");
+}
+async function gate(){
+  var isLocal=location.protocol!=="https:";
+  if(isLocal||!window.isSecureContext)return true;
+  if(localStorage.getItem(ACCESS_KEY)===ACCESS_HASH)return true;
+  for(;;){
+    var code=prompt("GOAT Group Tracker\n\nEnter access code:");
+    if(code===null)continue;
+    if(await sha256hex(code.trim())===ACCESS_HASH){localStorage.setItem(ACCESS_KEY,ACCESS_HASH);return true}
+    alert("Wrong access code.");
+  }
+}
+gate().then(refresh);
+setInterval(refresh,REFRESH_MINUTES*60*1000);
+document.addEventListener("keydown",function(e){
+  if(e.key==="ArrowRight")nav(1);
+  else if(e.key==="ArrowLeft")nav(-1);
+  else if(e.key===" "){e.preventDefault();togglePause()}
+});
+</script>
+</body>
+</html>
