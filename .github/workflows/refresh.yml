@@ -22,7 +22,7 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -43,6 +43,8 @@ jobs:
             data
             site/command-center/data.json
             site/call-board/data.json
+            site/ca-board/data.json
+            site/tech-board/data.json
           key: reports-${{ github.run_id }}
           restore-keys: reports-
 
@@ -66,7 +68,7 @@ jobs:
 
       # ---- Command Center + 4 Day Call board (live from the ServiceTitan API) ----
       - name: Command Center -> site/command-center/data.json
-        timeout-minutes: 8
+        timeout-minutes: 16
         continue-on-error: true
         env:
           ST_SECRETS_JSON: ${{ secrets.ST_SECRETS_JSON }}
@@ -76,6 +78,8 @@ jobs:
           printf '%s' "$ST_SECRETS_JSON" > secrets/servicetitan.json
           python build/command_center_refresh.py || echo "ST refresh failed - deploying cached data.json"
           python build/call_board_refresh.py || echo "Call board refresh failed - deploying cached data.json"
+          python build/ca_board_refresh.py || echo "CA board refresh failed - deploying cached data.json"
+          python build/tech_board_refresh.py || echo "Tech board refresh failed - deploying cached data.json"
           rm -rf secrets
 
       - name: Save reports + history for next run
@@ -86,6 +90,8 @@ jobs:
             data
             site/command-center/data.json
             site/call-board/data.json
+            site/ca-board/data.json
+            site/tech-board/data.json
           key: reports-${{ github.run_id }}
 
       - name: Upload site
