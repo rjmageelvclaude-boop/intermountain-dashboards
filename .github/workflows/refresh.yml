@@ -23,7 +23,7 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -47,6 +47,8 @@ jobs:
             site/ca-board/data.json
             site/tech-board/data.json
             site/plumb-board/data.json
+            site/csr-board/data.json
+            site/install-board/data.json
           key: reports-${{ github.run_id }}
           restore-keys: reports-
 
@@ -70,7 +72,7 @@ jobs:
 
       # ---- Command Center + 4 Day Call board (live from the ServiceTitan API) ----
       - name: Command Center -> site/command-center/data.json
-        timeout-minutes: 12
+        timeout-minutes: 15
         continue-on-error: true
         env:
           ST_SECRETS_JSON: ${{ secrets.ST_SECRETS_JSON }}
@@ -79,6 +81,8 @@ jobs:
           # per run, resuming from the cached history file on the next run.
           TECH_BOARD_BUDGET: "90"
           PLUMB_BOARD_BUDGET: "90"
+          CSR_BOARD_BUDGET: "90"
+          INSTALL_BOARD_BUDGET: "120"
         run: |
           mkdir -p secrets
           printf '%s' "$ST_SECRETS_JSON" > secrets/servicetitan.json
@@ -87,6 +91,8 @@ jobs:
           python build/ca_board_refresh.py || echo "CA board refresh failed - deploying cached data.json"
           python build/tech_board_refresh.py || echo "Tech board refresh failed - deploying cached data.json"
           python build/plumb_board_refresh.py || echo "Plumb board refresh failed - deploying cached data.json"
+          python build/csr_board_refresh.py || echo "CSR board refresh failed - deploying cached data.json"
+          python build/install_board_refresh.py || echo "Install board refresh failed - deploying cached data.json"
           rm -rf secrets
 
       - name: Save reports + history for next run
@@ -100,6 +106,8 @@ jobs:
             site/ca-board/data.json
             site/tech-board/data.json
             site/plumb-board/data.json
+            site/csr-board/data.json
+            site/install-board/data.json
           key: reports-${{ github.run_id }}
 
       - name: Upload site
