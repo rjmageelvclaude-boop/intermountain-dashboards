@@ -67,7 +67,7 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 from command_center_live import (fetch_all, local_today, _load_json,
                                  map_companies, update_history)
-from csr_board_live import EXCLUDE_NAME, month_window_utc, _month_key
+from csr_board_live import EXCLUDE_NAME, month_window_utc, _month_key, _iso_z
 from tech_board_live import _is_memb_sku
 
 HISTORY_FILE = os.path.join(ROOT, "data", "member-board-history.json")
@@ -194,9 +194,10 @@ def _member_on(spans, cid, day, buffer_days=0):
 # ---------------------------------------------------------------- window core
 def _new_counters():
     return {"sold": 0, "soldBilling": {}, "canceled": 0, "checksWon": 0,
+            "checksWonHvac": 0, "checksWonPlumb": 0,
             "jobsCompleted": 0, "sellers": {}, "byBU": {},
             "totalRev": 0.0, "memberRev": 0.0, "crossRev": 0.0,
-            "nonMemberJobs": 0, "offered": 0}
+            "nonMemberJobs": 0, "offered": 0, "techOffer": {}}
 
 def compute_month(company, year, month, real_ids, bu_names):
     """Raw counters for one tenant-local calendar month."""
@@ -240,11 +241,17 @@ def compute_month(company, year, month, real_ids, bu_names):
         if cancel and lo <= cancel < hi:
             c["canceled"] += 1
 
-    # ACTIVATE - system checks completed (event reached Won) in the window
-    c["checksWon"] = len(fetch_all(
-        tenant, "/memberships/v2/tenant/{tenant}/recurring-service-events",
-        {"status": "Won", "modifiedOnOrAfter": start, "modifiedBefore": end},
-        page_size=500, max_pages=40))
+    # ACTIVATE - system checks completed (event reached Won) in the window,
+    # split by trade from the recurring service's name
+    for rse in fetch_all(
+            tenant, "/memberships/v2/tenant/{tenant}/recurring-service-events",
+            {"status": "Won", "modifiedOnOrAfter": start, "modifiedBefore": end},
+            page_size=500, max_pages=40):
+        c["checksWon"] += 1
+        if _trade_of(rse.get("locationRecurringServiceName")) == "plumbing":
+            c["checksWonPlumb"] += 1
+        else:
+            c["checksWonHvac"] += 1
 
     # Attach-rate denominator - every completed job is a membership chance
     jobs = fetch_all(tenant, "/jpm/v2/tenant/{tenant}/jobs",
@@ -261,6 +268,17 @@ def compute_month(company, year, month, real_ids, bu_names):
         if jid and any(_is_memb_sku(company, (it.get("sku") or {}).get("name"))
                        for it in (est.get("items") or [])):
             offer_jobs.add(jid)
+
+    # Job -> tech attribution via payroll splits (the tech board's method;
+    # splits are created at assignment, so buffer the window start)
+    buf = _iso_z(dt.datetime.strptime(start, "%Y-%m-%dT%H:%M:%SZ")
+                 - dt.timedelta(days=60))
+    splits_by_job = {}
+    for s in fetch_all(tenant, "/payroll/v2/tenant/{tenant}/jobs/splits",
+                       {"createdOnOrAfter": buf, "createdBefore": end},
+                       page_size=500, max_pages=100):
+        if (s.get("split") or 0) > 0:
+            splits_by_job.setdefault(s["jobId"], set()).add(s["technicianId"])
 
     # Revenue - invoices dated in the calendar month (invoiceDate is a
     # calendar date stored as midnight UTC, so the window is calendar too)
@@ -299,8 +317,13 @@ def compute_month(company, year, month, real_ids, bu_names):
         if member:
             continue
         c["nonMemberJobs"] += 1
-        if j.get("id") in offer_jobs or (cid, day) in sold_same_day:
+        offered = j.get("id") in offer_jobs or (cid, day) in sold_same_day
+        if offered:
             c["offered"] += 1
+        for tid in splits_by_job.get(j.get("id"), ()):
+            t = c["techOffer"].setdefault(str(tid), {"nm": 0, "off": 0})
+            t["nm"] += 1
+            t["off"] += offered
 
     c["totalRev"] = round(c["totalRev"], 2)
     c["memberRev"] = round(c["memberRev"], 2)
@@ -358,9 +381,8 @@ def compute_company(company, deadline=None, progress=None):
     for year, month in months:
         key = _month_key(year, month)
         entry = co_cache.get(key)
-        # months cached before the revenue/cross-sell/offer metrics existed
-        # are recomputed rather than reused
-        if entry and "totalRev" not in entry.get("m", {}):
+        # months cached before the newest metrics existed are recomputed
+        if entry and "techOffer" not in entry.get("m", {}):
             entry = None
         if entry and key != current_key:
             month_end = dt.date(year + (month == 12), month % 12 + 1, 1)
@@ -391,9 +413,14 @@ def compute_company(company, deadline=None, progress=None):
 def _sum_counters(dicts):
     total = _new_counters()
     for d in dicts:
-        for k in ("sold", "canceled", "checksWon", "jobsCompleted",
-                  "totalRev", "memberRev", "crossRev", "nonMemberJobs", "offered"):
+        for k in ("sold", "canceled", "checksWon", "checksWonHvac", "checksWonPlumb",
+                  "jobsCompleted", "totalRev", "memberRev", "crossRev",
+                  "nonMemberJobs", "offered"):
             total[k] += d.get(k, 0)
+        for tid, t in d.get("techOffer", {}).items():
+            agg = total["techOffer"].setdefault(tid, {"nm": 0, "off": 0})
+            agg["nm"] += t["nm"]
+            agg["off"] += t["off"]
         for k, v in d["soldBilling"].items():
             total["soldBilling"][k] = total["soldBilling"].get(k, 0) + v
         for k, v in d["byBU"].items():
@@ -415,6 +442,8 @@ def _kpis(c):
         "canceled": c["canceled"],
         "net": sold - c["canceled"],
         "checksWon": c["checksWon"],
+        "checksWonHvac": c.get("checksWonHvac", 0),
+        "checksWonPlumb": c.get("checksWonPlumb", 0),
         "jobsCompleted": jobs,
         "attachRate": round(sold / jobs * 100, 1) if jobs else 0,
         "pctSoldMonthly": round(monthly / sold * 100, 1) if sold else 0,
@@ -432,6 +461,7 @@ def _kpis(c):
 
 def _seller_rows(c, roster, company):
     co = COMPANIES[company]
+    tech_offer = c.get("techOffer", {})
     techs, csrs = [], []
     for sid, s in c["sellers"].items():
         info = roster.get(int(sid))
@@ -443,6 +473,10 @@ def _seller_rows(c, roster, company):
                "company": company, "companyLabel": co["label"], "color": co["color"],
                "sold": s["n"], "soldMonthly": s["mo"],
                "pctMonthly": round(s["mo"] / s["n"] * 100) if s["n"] else 0}
+        if info and info["kind"] == "tech":
+            t = tech_offer.get(sid, {"nm": 0, "off": 0})
+            row["nmJobs"] = t["nm"]
+            row["offerRate"] = round(t["off"] / t["nm"] * 100) if t["nm"] else 0
         (techs if info and info["kind"] == "tech" else csrs).append(row)
     key = lambda r: (-r["sold"], -r["soldMonthly"], r["name"])
     return sorted(techs, key=key), sorted(csrs, key=key)
@@ -498,7 +532,8 @@ def compute(time_budget_secs=None, progress=None):
     # combined = sum of the three companies
     for view in boards:
         per_co = [boards[view][c] for c in COMPANIES]
-        sum_keys = ("sold", "canceled", "net", "checksWon", "jobsCompleted",
+        sum_keys = ("sold", "canceled", "net", "checksWon", "checksWonHvac",
+                    "checksWonPlumb", "jobsCompleted",
                     "totalRev", "memberRev", "crossRev", "nonMemberJobs", "offered")
         kpis = {k: 0 for k in sum_keys}
         kpis["soldBilling"] = {}

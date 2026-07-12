@@ -100,6 +100,8 @@ body{font-family:'Montserrat','Segoe UI',system-ui,sans-serif;background:#f2f3f5
 .lrow .ls{font-size:10px;font-weight:700;color:#9aa1ab;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lrow .chip{font-size:9.5px;font-weight:800;color:#555;background:#e7e9ec;border-radius:5px;padding:3px 6px;white-space:nowrap}
 .lrow.top1 .chip{background:rgba(255,255,255,.22);color:#fff}
+.lrow .chip.good{background:#2fbf5f;color:#fff}
+.lrow .chip.warn{background:#f0b429;color:#fff}
 .lrow .sold{text-align:right;min-width:44px}
 .lrow .sold .n{font-size:19px;font-weight:900;line-height:1}
 .lrow .sold .l{font-size:8.5px;font-weight:800;color:#9aa1ab;text-transform:uppercase}
@@ -180,7 +182,7 @@ function kpisHtml(k, snap) {
     <div class="kpi"><div class="v ${net < 0 ? "neg" : "pos"}">${net > 0 ? "+" : ""}${fmt(net)}</div>
       <div class="k">Net Member Growth</div><div class="s">sold − canceled</div></div>
     <div class="kpi"><div class="v">${fmt(k.checksWon)}</div><div class="k">System Checks Run</div>
-      <div class="s">1+ check ≈ 4× retention</div></div>
+      <div class="s">${fmt(k.checksWonHvac)} HVAC · ${fmt(k.checksWonPlumb)} Plumbing · 1+ check ≈ 4× retention</div></div>
     <div class="kpi"><div class="v">${money(k.memberRev)}</div><div class="k">Member Revenue</div>
       <div class="s">${k.pctMemberRev}% of ${money(k.totalRev)} total</div></div>
     <div class="kpi"><div class="v ${k.offerRate >= 75 ? "pos" : "neg"}">${k.offerRate}%</div>
@@ -300,7 +302,8 @@ function lbHtml(rows, title, sub, emptyMsg) {
         <span class="rank">#${i + 1}</span>
         <span class="who"><span class="ln">${r.name}</span>
           <span class="ls">${isCombined ? r.companyLabel + (r.sub ? " · " + r.sub : "") : (r.sub || "")}</span></span>
-        ${r.sold > 1 ? `<span class="chip">${r.pctMonthly}% monthly</span>` : ""}
+        ${r.nmJobs > 0 ? `<span class="chip ${r.offerRate >= 75 ? "good" : "warn"}" title="Offered on ${Math.round(r.offerRate * r.nmJobs / 100)} of ${r.nmJobs} non-member jobs">${r.offerRate}% offer rate</span>`
+          : r.sold > 1 ? `<span class="chip">${r.pctMonthly}% monthly</span>` : ""}
         <span class="chip">bonus $${fmt(r.sold * SALE_BONUS)}</span>
         <span class="sold"><span class="n">${fmt(r.sold)}</span><span class="l">sold</span></span>
       </div>`).join("") : `<div class="empty">${emptyMsg}</div>`}</div>
