@@ -56,6 +56,7 @@ jobs:
             site/goat-board/data.json
             site/scorecard/data.json
             site/wow-board/data.json
+            site/member-board/data.json
           key: reports-${{ github.run_id }}
           restore-keys: reports-
 
@@ -85,6 +86,7 @@ jobs:
           SCORECARD_BUDGET: "120"
           # Generous: a cold cache re-backfills every week since May 1 in one run.
           WOW_BOARD_BUDGET: "300"
+          MEMBER_BOARD_BUDGET: "120"
           # Pay privacy: pay ships only as an AES-256-GCM blob under this
           # passphrase; unset -> the scorecard publishes without pay.
           SCORECARD_KEY: ${{ secrets.SCORECARD_KEY }}
@@ -95,7 +97,7 @@ jobs:
 
           # Boards staggered a touch so eight processes don't hit the auth
           # server in the same instant.
-          for board in command_center call_board ca_board tech_board plumb_board csr_board install_board silo_board wow_board; do
+          for board in command_center call_board ca_board tech_board plumb_board csr_board install_board silo_board wow_board member_board; do
             python "build/${board}_refresh.py" > "logs/${board}.log" 2>&1 \
               || echo "${board} refresh failed - deploying cached data.json" >> "logs/${board}.log" &
             sleep 2
@@ -148,6 +150,7 @@ jobs:
             site/goat-board/data.json
             site/scorecard/data.json
             site/wow-board/data.json
+            site/member-board/data.json
           key: reports-${{ github.run_id }}
 
       - name: Upload site

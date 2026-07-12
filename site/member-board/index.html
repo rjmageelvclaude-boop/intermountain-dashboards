@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Memberships Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Montserrat','Segoe UI',system-ui,sans-serif;background:#f2f3f5;color:#111;min-height:100vh}
+.wrap{max-width:1720px;margin:0 auto;padding:14px 22px 24px}
+.topbar{display:flex;align-items:center;gap:16px;margin-bottom:12px;flex-wrap:wrap}
+.big-title{font-size:44px;font-weight:900;letter-spacing:-1px;text-transform:uppercase;line-height:1;white-space:nowrap}
+.big-title .view{font-size:16px;font-weight:800;color:#888;margin-left:8px;letter-spacing:0}
+.nav{flex:1;display:flex;justify-content:center;align-items:center;gap:14px;font-weight:800;font-size:14px;letter-spacing:.5px;flex-wrap:wrap}
+.nav button{border:0;background:none;font:inherit;font-weight:800;cursor:pointer;color:#111;text-transform:uppercase;letter-spacing:.5px;padding:6px 8px;border-radius:6px}
+.nav button:hover{background:#e5e7eb}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.tab{cursor:pointer;user-select:none;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#555;background:#e7e9ec;border:2px solid transparent;white-space:nowrap}
+.tab:hover{color:#111;border-color:#c9ced6}
+.tab.on{background:var(--tabco,#1663c7);color:#fff}
+.viewtabs{display:flex;gap:6px}
+.viewtabs .tab.on{background:#111}
+
+/* KPI strip */
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
+.kpi{background:#fff;border-radius:12px;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.kpi .v{font-size:34px;font-weight:900;line-height:1.05;letter-spacing:-.5px}
+.kpi .k{font-size:11px;font-weight:800;color:#8a919c;text-transform:uppercase;letter-spacing:.04em;margin-top:4px;line-height:1.2}
+.kpi .s{font-size:11px;font-weight:700;color:#555;margin-top:5px}
+.kpi.hero{background:var(--co,#1663c7)}
+.kpi.hero .v,.kpi.hero .s{color:#fff}
+.kpi.hero .k{color:rgba(255,255,255,.85)}
+.kpi .v.neg{color:#b42318}
+.kpi .v.pos{color:#15803d}
+
+/* belief strip */
+.beliefs{display:flex;gap:10px;align-items:center;background:#111827;color:#fff;border-radius:12px;
+  padding:10px 16px;margin:12px 0;flex-wrap:wrap;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.beliefs .tag{font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#e0a421;white-space:nowrap}
+.beliefs .b{flex:1;min-width:170px;text-align:center;font-size:12px;font-weight:700;color:#cbd5e1;line-height:1.25}
+.beliefs .b b{display:block;font-size:17px;font-weight:900;color:#fff}
+
+/* panels */
+.panels{display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:12px;margin-bottom:12px}
+.panel{background:#fff;border-radius:12px;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,.08);min-height:210px;display:flex;flex-direction:column}
+.p-title{font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.05em;color:#555}
+.p-sub{font-size:10.5px;font-weight:700;color:#9aa1ab;margin-top:2px}
+
+/* billing mix */
+.mixbar{display:flex;height:34px;border-radius:8px;overflow:hidden;margin-top:14px;background:#eef0f3}
+.mixbar div{min-width:2px;margin-right:2px}
+.mixbar div:last-child{margin-right:0}
+.mixlegend{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+.mixrow{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700}
+.dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.mixrow .n{margin-left:auto;font-weight:900}
+.mixrow .p{color:#8a919c;font-weight:700;width:46px;text-align:right}
+
+/* trend chart */
+.chart{flex:1;display:flex;align-items:flex-end;gap:4px;margin-top:14px;min-height:150px}
+.mon{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end}
+.bars{display:flex;align-items:flex-end;gap:2px;width:100%;flex:1}
+.bar{flex:1;border-radius:4px 4px 0 0;position:relative;min-height:2px}
+.bar .bv{position:absolute;top:-15px;left:50%;transform:translateX(-50%);font-size:9.5px;font-weight:800;color:#555;white-space:nowrap}
+.mon .ml{font-size:10px;font-weight:800;color:#9aa1ab;text-transform:uppercase}
+.chartlegend{display:flex;gap:14px;margin-top:10px;font-size:11px;font-weight:800;color:#555}
+.chartlegend span{display:flex;align-items:center;gap:5px}
+
+/* BU list */
+.bulist{margin-top:12px;display:flex;flex-direction:column;gap:7px}
+.burow{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700}
+.burow .bn{width:44%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.burow .track{flex:1;height:14px;background:#eef0f3;border-radius:4px;overflow:hidden}
+.burow .fill{height:100%;background:var(--co,#1663c7);border-radius:4px;min-width:2px}
+.burow .bnum{width:34px;text-align:right;font-weight:900}
+
+/* leaderboards */
+.boards2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.lb{background:#fff;border-radius:12px;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.lb-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:10px}
+.lb-title{font-size:17px;font-weight:900;text-transform:uppercase;letter-spacing:-.3px}
+.lb-sub{font-size:10.5px;font-weight:700;color:#9aa1ab}
+.lb-rows{display:flex;flex-direction:column;gap:6px}
+.lrow{display:flex;align-items:center;gap:10px;background:#f5f6f8;border-radius:9px;padding:7px 10px}
+.lrow.top1{background:var(--co,#1663c7)}
+.lrow.top1 .ln,.lrow.top1 .sold .n{color:#fff}
+.lrow.top1 .ls,.lrow.top1 .sold .l{color:rgba(255,255,255,.8)}
+.lrow .rank{background:var(--co,#1663c7);color:#fff;font-weight:900;border-radius:6px;padding:4px 8px;font-size:12px;min-width:34px;text-align:center}
+.lrow.top1 .rank{background:rgba(255,255,255,.22)}
+.lrow .who{flex:1;min-width:0}
+.lrow .ln{font-size:14px;font-weight:900;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.15}
+.lrow .ls{font-size:10px;font-weight:700;color:#9aa1ab;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lrow .chip{font-size:9.5px;font-weight:800;color:#555;background:#e7e9ec;border-radius:5px;padding:3px 6px;white-space:nowrap}
+.lrow.top1 .chip{background:rgba(255,255,255,.22);color:#fff}
+.lrow .sold{text-align:right;min-width:44px}
+.lrow .sold .n{font-size:19px;font-weight:900;line-height:1}
+.lrow .sold .l{font-size:8.5px;font-weight:800;color:#9aa1ab;text-transform:uppercase}
+.lb .more{margin-top:8px;font-size:11px;font-weight:700;color:#9aa1ab;text-align:center}
+
+.footer{margin-top:12px;display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:#999;flex-wrap:wrap;gap:6px}
+.warn-note{color:#b45309}
+.empty{padding:40px 0;text-align:center;font-size:15px;font-weight:800;color:#999}
+@media(max-width:1200px){
+  .kpis{grid-template-columns:repeat(3,1fr)}
+  .panels{grid-template-columns:1fr 1fr}
+  .panels .panel:nth-child(2){grid-column:1/-1;order:-1}
+}
+@media(max-width:700px){
+  .kpis{grid-template-columns:1fr 1fr}
+  .panels,.boards2{grid-template-columns:1fr}
+  .big-title{font-size:30px}
+  .kpi .v{font-size:26px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="big-title"><span id="t-co">MEMBERSHIPS</span><span class="view" id="t-view">MTD</span></div>
+    <div class="nav">
+      <button id="prev">&lt; Prev</button>
+      <button id="next">Next &gt;</button>
+      <span style="color:#ccc">|</span>
+      <button id="pause">Pause</button>
+    </div>
+    <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+      <div class="viewtabs" id="viewtabs"></div>
+      <div class="tabs" id="tabs"></div>
+    </div>
+  </div>
+  <div id="board"><div class="empty">Waiting for data…</div></div>
+  <div class="footer">
+    <span id="updated"></span>
+    <span id="note"></span>
+  </div>
+</div>
+<script>
+"use strict";
+const ROTATE_SECS = 15, RELOAD_MINS = 5;
+const BOARD_ORDER = ["sierra", "ultimate", "russett", "combined"];
+const VIEWS = ["mtd", "ytd"];
+const COMBINED = {label: "Combined", color: "#111827"};
+// billing-mix colors: monthly auto-pay is the playbook's win condition
+const BILLING = [["Monthly", "#15803d"], ["Annual", "#7c3aed"],
+                 ["OneTime", "#b45309"], ["Quarterly", "#94a3b8"], ["BiAnnual", "#94a3b8"]];
+const SOLD_C = "#15803d", CANC_C = "#b45309";
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+let DATA = null, paused = false;
+let curView = "mtd", curBoard = "sierra";
+
+const $ = id => document.getElementById(id);
+const fmt = n => (n || 0).toLocaleString("en-US");
+
+function co() { return curBoard === "combined" ? COMBINED : DATA.companies[curBoard]; }
+
+function kpisHtml(k, snap) {
+  const net = k.net;
+  return `<div class="kpis" style="--co:${co().color}">
+    <div class="kpi hero"><div class="v">${fmt(snap.active)}</div><div class="k">Active Members</div>
+      <div class="s">as of today</div></div>
+    <div class="kpi"><div class="v">${snap.pctMonthly}%</div><div class="k">On Monthly Auto-Pay</div>
+      <div class="s">of active base — playbook target: max</div></div>
+    <div class="kpi"><div class="v">${fmt(k.sold)}</div><div class="k">Memberships Sold</div>
+      <div class="s">${k.attachRate} per 100 completed jobs</div></div>
+    <div class="kpi"><div class="v">${fmt(k.canceled)}</div><div class="k">Canceled</div>
+      <div class="s">effective this period</div></div>
+    <div class="kpi"><div class="v ${net < 0 ? "neg" : "pos"}">${net > 0 ? "+" : ""}${fmt(net)}</div>
+      <div class="k">Net Member Growth</div><div class="s">sold − canceled</div></div>
+    <div class="kpi"><div class="v">${fmt(k.checksWon)}</div><div class="k">System Checks Run</div>
+      <div class="s">1+ check ≈ 4× retention</div></div>
+  </div>`;
+}
+
+const BELIEFS = `<div class="beliefs">
+  <span class="tag">Why memberships<br>— the playbook</span>
+  <div class="b"><b>~5×</b>member lifetime value vs non-members</div>
+  <div class="b"><b>2.9×</b>customer repeat rate</div>
+  <div class="b"><b>8×</b>cross-sell rate into other trades</div>
+  <div class="b"><b>4×</b>retention after 1+ system check</div>
+  <div class="b"><b>66% vs 42%</b>monthly auto-pay retention vs annual</div>
+</div>`;
+
+function mixHtml(snap) {
+  const total = snap.active || 1;
+  const known = BILLING.map(([k]) => snap.billing[k] || 0).reduce((a, b) => a + b, 0);
+  const rows = BILLING.filter(([k]) => snap.billing[k])
+    .map(([k, c]) => [k === "OneTime" ? "One-Time Pay" : k, c, snap.billing[k]]);
+  if (known < snap.active) rows.push(["Other", "#cbd5e1", snap.active - known]);
+  return `<div class="panel">
+    <div class="p-title">Active base by billing type</div>
+    <div class="p-sub">Retain — monthly auto-pay is the clear winner</div>
+    <div class="mixbar">${rows.map(([k, c, n]) =>
+      `<div style="flex:${n};background:${c}" title="${k}: ${fmt(n)}"></div>`).join("")}</div>
+    <div class="mixlegend">${rows.map(([k, c, n]) =>
+      `<div class="mixrow"><span class="dot" style="background:${c}"></span>${k}
+       <span class="n">${fmt(n)}</span><span class="p">${Math.round(n / total * 100)}%</span></div>`).join("")}</div>
+  </div>`;
+}
+
+function trendHtml() {
+  const rows = DATA.trend[curBoard] || [];
+  if (!rows.length) return `<div class="panel"><div class="p-title">Monthly trend</div><div class="empty">No data yet</div></div>`;
+  const max = Math.max(...rows.map(r => Math.max(r.sold, r.canceled)), 1);
+  return `<div class="panel">
+    <div class="p-title">Sold vs canceled by month</div>
+    <div class="p-sub">Sell &amp; retain — grow a sustainable book of business</div>
+    <div class="chart">${rows.map(r => {
+      const mi = parseInt(r.m.slice(5), 10) - 1;
+      return `<div class="mon">
+        <div class="bars">
+          <div class="bar" style="height:${r.sold / max * 100}%;background:${SOLD_C}" title="${MONTHS[mi]}: ${fmt(r.sold)} sold"><span class="bv">${fmt(r.sold)}</span></div>
+          <div class="bar" style="height:${r.canceled / max * 100}%;background:${CANC_C}" title="${MONTHS[mi]}: ${fmt(r.canceled)} canceled"></div>
+        </div><div class="ml">${MONTHS[mi]}</div></div>`;
+    }).join("")}</div>
+    <div class="chartlegend">
+      <span><span class="dot" style="background:${SOLD_C}"></span>Sold</span>
+      <span><span class="dot" style="background:${CANC_C}"></span>Canceled</span>
+    </div>
+  </div>`;
+}
+
+function buHtml(b) {
+  let rows, title, sub;
+  if (curBoard === "combined") {
+    rows = BOARD_ORDER.slice(0, 3).map(c => ({
+      name: DATA.companies[c].label, n: DATA.boards[curView][c].kpis.sold,
+      color: DATA.companies[c].color}));
+    title = "Memberships sold by company"; sub = "Sell — every customer, every time";
+  } else {
+    rows = (b.byBU || []).map(r => ({...r, color: co().color}));
+    title = "Sold by business unit"; sub = "Sell — every job type merits an offer";
+  }
+  const max = Math.max(...rows.map(r => r.n), 1);
+  return `<div class="panel">
+    <div class="p-title">${title}</div><div class="p-sub">${sub}</div>
+    <div class="bulist">${rows.length ? rows.map(r =>
+      `<div class="burow"><span class="bn" title="${r.name}">${r.name}</span>
+       <span class="track"><span class="fill" style="display:block;width:${r.n / max * 100}%;background:${r.color}"></span></span>
+       <span class="bnum">${fmt(r.n)}</span></div>`).join("") :
+      `<div class="empty">No sales yet this period</div>`}</div>
+  </div>`;
+}
+
+function lbHtml(rows, title, sub, emptyMsg) {
+  const top = rows.slice(0, 12);
+  const isCombined = curBoard === "combined";
+  return `<div class="lb">
+    <div class="lb-head"><span class="lb-title">${title}</span><span class="lb-sub">${sub}</span></div>
+    <div class="lb-rows">${top.length ? top.map((r, i) =>
+      `<div class="lrow ${i === 0 ? "top1" : ""}" style="--co:${r.color}">
+        <span class="rank">#${i + 1}</span>
+        <span class="who"><span class="ln">${r.name}</span>
+          <span class="ls">${isCombined ? r.companyLabel + (r.sub ? " · " + r.sub : "") : (r.sub || "")}</span></span>
+        ${r.sold > 1 ? `<span class="chip">${r.pctMonthly}% monthly</span>` : ""}
+        <span class="sold"><span class="n">${fmt(r.sold)}</span><span class="l">sold</span></span>
+      </div>`).join("") : `<div class="empty">${emptyMsg}</div>`}</div>
+    ${rows.length > 12 ? `<div class="more">+ ${rows.length - 12} more sellers</div>` : ""}
+  </div>`;
+}
+
+function render() {
+  if (!DATA) return;
+  const b = DATA.boards[curView][curBoard];
+  const snap = DATA.snapshot[curBoard];
+  $("t-co").textContent = co().label.toUpperCase() + " – MEMBERSHIPS";
+  $("t-view").textContent = curView.toUpperCase() + " · " + DATA.period[curView];
+  $("board").innerHTML =
+    kpisHtml(b.kpis, snap) + BELIEFS +
+    `<div class="panels">${mixHtml(snap)}${trendHtml()}${buHtml(b)}</div>` +
+    `<div class="boards2">
+      ${lbHtml(b.techs, "Tech Leaderboard", "memberships sold · " + DATA.period[curView], "No tech sales yet")}
+      ${lbHtml(b.csrs, "CSR & Office Leaderboard", "memberships sold · " + DATA.period[curView], "No office sales yet")}
+    </div>`;
+  document.querySelectorAll("#tabs .tab").forEach(t =>
+    t.classList.toggle("on", t.dataset.board === curBoard));
+  document.querySelectorAll("#viewtabs .tab").forEach(t =>
+    t.classList.toggle("on", t.dataset.view === curView));
+  $("updated").textContent = "Updated " + DATA.updated + " (live ServiceTitan API)";
+  $("note").textContent = DATA.complete ? "" : "Year-to-date backfill in progress — YTD totals will finish within the hour.";
+  $("note").className = DATA.complete ? "" : "warn-note";
+}
+
+function step(d) {
+  const i = BOARD_ORDER.indexOf(curBoard);
+  curBoard = BOARD_ORDER[(i + d + BOARD_ORDER.length) % BOARD_ORDER.length];
+  render();
+}
+function jump(board, view) { curBoard = board; curView = view; render(); }
+
+function buildTabs() {
+  $("tabs").innerHTML = BOARD_ORDER.map(b => {
+    const c = b === "combined" ? COMBINED : DATA.companies[b];
+    return `<div class="tab" data-board="${b}" style="--tabco:${c.color}">${c.label}</div>`;
+  }).join("");
+  document.querySelectorAll("#tabs .tab").forEach(t =>
+    t.onclick = () => jump(t.dataset.board, curView));
+  $("viewtabs").innerHTML = VIEWS.map(v =>
+    `<div class="tab" data-view="${v}">${v.toUpperCase()}</div>`).join("");
+  document.querySelectorAll("#viewtabs .tab").forEach(t =>
+    t.onclick = () => jump(curBoard, t.dataset.view));
+}
+
+async function load() {
+  try {
+    const r = await fetch("data.json?" + Date.now());
+    if (!r.ok) throw new Error(r.status);
+    DATA = await r.json();
+    buildTabs();
+    render();
+  } catch (e) {
+    if (!DATA) $("board").innerHTML = `<div class="empty">Could not load data.json (${e.message})</div>`;
+  }
+}
+
+$("prev").onclick = () => step(-1);
+$("next").onclick = () => step(1);
+$("pause").onclick = () => {
+  paused = !paused;
+  $("pause").textContent = paused ? "Play" : "Pause";
+};
+setInterval(() => { if (!paused && DATA) step(1); }, ROTATE_SECS * 1000);
+setInterval(load, RELOAD_MINS * 60 * 1000);
+load();
+</script>
+</body>
+</html>

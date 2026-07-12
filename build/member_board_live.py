@@ -1,0 +1,401 @@
+#!/usr/bin/env python3
+"""
+Live ServiceTitan engine for the Memberships Board.
+
+Built around the Leadership Summit membership belief system - members carry
+~5x lifetime value, so the board tracks the three levers the playbook says
+to manage: SELL (new memberships, stack-ranked by Tech and by CSR/office),
+ACTIVATE (system checks completed - 1+ check is worth ~4x retention), and
+RETAIN (monthly auto-pay mix, cancels, net growth) - for Sierra, Ultimate
+and Russett, plus a combined board.
+
+Memberships come straight from /memberships/v2 (the system of record):
+
+  sold          real memberships created in the window. "Real" = the
+                membership type's name passes the per-tenant filter below
+                (labor warranties are membership-type records in ST but are
+                not maintenance plans - they are excluded everywhere).
+  soldBilling   billing mix of those sales (Monthly / Annual / OneTime...);
+                the playbook's #1 retention lever is monthly auto-pay.
+  canceled      real memberships whose cancellationDate falls in the window
+                (found via modifiedOnOrAfter - a cancel touches the record).
+  checksWon     recurring-service events (system checks) that reached
+                status Won in the window, by modifiedOn. Won events always
+                carry the jobId of the visit that closed them.
+  jobsCompleted completed jobs in the window (any BU) - the "every customer
+                every time" denominator: attachRate = sold / jobs * 100.
+  sellers       per-seller sold counts via soldById. Technician ids and
+                employee ids never collide, so sellers split cleanly into
+                the Tech leaderboard and the CSR/Office leaderboard.
+  byBU          sales by the membership record's selling business unit.
+
+Snapshot metrics (active base, billing mix of the base, plan mix) are
+recomputed fresh every run from a status=Active fetch - they are cheap
+(~10k rows for Sierra in ~3s) and are point-in-time by nature.
+
+Closed months are cached in data/member-board-history.json and recomputed
+at most daily until 10 days past month-end, then frozen - same lifecycle
+as the other boards.
+
+CLI smoke test:
+    py build/member_board_live.py                 # all companies, current month
+    py build/member_board_live.py sierra 2026-06  # one company, one month
+"""
+import datetime as dt
+import os
+import re
+import sys
+import time
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
+sys.path.insert(0, HERE)
+from command_center_live import (fetch_all, local_today, _load_json,
+                                 map_companies, update_history)
+from csr_board_live import EXCLUDE_NAME, month_window_utc, _month_key
+
+HISTORY_FILE = os.path.join(ROOT, "data", "member-board-history.json")
+MONTH_FREEZE_DAYS = 10
+MONTH_RECHECK_HOURS = 24
+
+COMPANIES = {
+    "sierra":   {"tenant": "SIE", "tz": "pacific",  "label": "Sierra",   "color": "#1663c7"},
+    "ultimate": {"tenant": "ULT", "tz": "mountain", "label": "Ultimate", "color": "#c7161d"},
+    "russett":  {"tenant": "RUS", "tz": "arizona",  "label": "Russett",  "color": "#0e7a3d"},
+}
+
+# Extended labor warranties live in ST as membership types but are not
+# maintenance memberships - keep them out of every count on this board.
+NOT_A_MEMBERSHIP = re.compile(r"warranty", re.I)
+
+BILLING_KEYS = ("Monthly", "Annual", "OneTime", "Quarterly", "BiAnnual")
+
+
+# ---------------------------------------------------------------- reference data
+def membership_types(company):
+    """{typeId: name} for every membership type, active or not."""
+    co = COMPANIES[company]
+    types = fetch_all(co["tenant"], "/memberships/v2/tenant/{tenant}/membership-types",
+                      {"active": "Any"}, page_size=200, max_pages=5)
+    return {t["id"]: t.get("name") or "" for t in types}
+
+def real_type_ids(type_names):
+    return {tid for tid, name in type_names.items()
+            if not NOT_A_MEMBERSHIP.search(name)}
+
+def business_unit_names(company):
+    co = COMPANIES[company]
+    bus = fetch_all(co["tenant"], "/settings/v2/tenant/{tenant}/business-units",
+                    {}, page_size=200, max_pages=5)
+    return {b["id"]: (b.get("name") or "").strip() for b in bus}
+
+def seller_roster(company):
+    """Everyone a membership's soldById can point at: {id: {name, kind, sub}}.
+    kind is 'tech' or 'office'; sub is the tech's team or the employee's role.
+    Includes inactive people so historical sales still resolve to a name."""
+    co = COMPANIES[company]
+    roster = {}
+    for e in fetch_all(co["tenant"], "/settings/v2/tenant/{tenant}/employees",
+                       {"active": "Any"}, page_size=200, max_pages=20):
+        name = re.sub(r"\s+", " ", (e.get("name") or "").strip())
+        if not name:
+            continue
+        roster[e["id"]] = {"name": name, "kind": "office",
+                           "sub": e.get("role") or "",
+                           "person": not EXCLUDE_NAME.search(name)}
+    for t in fetch_all(co["tenant"], "/settings/v2/tenant/{tenant}/technicians",
+                       {"active": "Any"}, page_size=200, max_pages=20):
+        name = re.sub(r"\s+", " ", (t.get("name") or "").strip())
+        if not name:
+            continue
+        roster[t["id"]] = {"name": name, "kind": "tech",
+                           "sub": t.get("team") or "",
+                           "person": not EXCLUDE_NAME.search(name)}
+    return roster
+
+
+# ---------------------------------------------------------------- window core
+def _new_counters():
+    return {"sold": 0, "soldBilling": {}, "canceled": 0, "checksWon": 0,
+            "jobsCompleted": 0, "sellers": {}, "byBU": {}}
+
+def compute_month(company, year, month, real_ids, bu_names):
+    """Raw counters for one tenant-local calendar month."""
+    co = COMPANIES[company]
+    tenant = co["tenant"]
+    start, end = month_window_utc(co["tz"], year, month)
+    c = _new_counters()
+
+    # SELL - new memberships created in the window
+    for m in fetch_all(tenant, "/memberships/v2/tenant/{tenant}/memberships",
+                       {"createdOnOrAfter": start, "createdBefore": end},
+                       page_size=500, max_pages=40):
+        if m.get("membershipTypeId") not in real_ids:
+            continue
+        c["sold"] += 1
+        bill = m.get("billingFrequency") or "Unknown"
+        c["soldBilling"][bill] = c["soldBilling"].get(bill, 0) + 1
+        seller = m.get("soldById")
+        if seller:
+            s = c["sellers"].setdefault(str(seller), {"n": 0, "mo": 0})
+            s["n"] += 1
+            if bill == "Monthly":
+                s["mo"] += 1
+        bu = bu_names.get(m.get("businessUnitId"))
+        if bu:
+            c["byBU"][bu] = c["byBU"].get(bu, 0) + 1
+
+    # RETAIN - cancels whose effective date falls in this month. A cancel
+    # touches modifiedOn, so fetch everything modified since month start
+    # (cancels are sometimes entered after the effective month closes).
+    lo, hi = start[:10], end[:10]
+    for m in fetch_all(tenant, "/memberships/v2/tenant/{tenant}/memberships",
+                       {"modifiedOnOrAfter": start},
+                       page_size=500, max_pages=40):
+        if m.get("membershipTypeId") not in real_ids:
+            continue
+        cancel = (m.get("cancellationDate") or "")[:10]
+        if cancel and lo <= cancel < hi:
+            c["canceled"] += 1
+
+    # ACTIVATE - system checks completed (event reached Won) in the window
+    c["checksWon"] = len(fetch_all(
+        tenant, "/memberships/v2/tenant/{tenant}/recurring-service-events",
+        {"status": "Won", "modifiedOnOrAfter": start, "modifiedBefore": end},
+        page_size=500, max_pages=40))
+
+    # Attach-rate denominator - every completed job is a membership chance
+    c["jobsCompleted"] = len(fetch_all(
+        tenant, "/jpm/v2/tenant/{tenant}/jobs",
+        {"completedOnOrAfter": start, "completedBefore": end},
+        page_size=500, max_pages=40))
+    return c
+
+
+# ---------------------------------------------------------------- snapshot
+def compute_snapshot(company, real_ids, type_names):
+    """Point-in-time view of the active membership base."""
+    co = COMPANIES[company]
+    billing, by_type, total = {}, {}, 0
+    for m in fetch_all(co["tenant"], "/memberships/v2/tenant/{tenant}/memberships",
+                       {"status": "Active"}, page_size=500, max_pages=100):
+        tid = m.get("membershipTypeId")
+        if tid not in real_ids:
+            continue
+        total += 1
+        bill = m.get("billingFrequency") or "Unknown"
+        billing[bill] = billing.get(bill, 0) + 1
+        by_type[tid] = by_type.get(tid, 0) + 1
+    plans = sorted(({"name": type_names.get(tid, "Unknown"), "n": n}
+                    for tid, n in by_type.items()), key=lambda p: -p["n"])
+    return {"active": total, "billing": billing,
+            "pctMonthly": round(billing.get("Monthly", 0) / total * 100, 1) if total else 0,
+            "plans": plans[:12]}
+
+
+# ---------------------------------------------------------------- caching
+def months_of_year(company):
+    today = local_today(COMPANIES[company]["tz"])
+    return [(today.year, m) for m in range(1, today.month + 1)], today
+
+def compute_company(company, deadline=None, progress=None):
+    """Counters for every month this year, cached for closed months.
+    Returns (months_dict, roster, snapshot, complete)."""
+    cache = _load_json(HISTORY_FILE, {})
+    co_cache = cache.get(company, {})
+    months, today = months_of_year(company)
+    current_key = _month_key(today.year, today.month)
+    complete = True
+
+    type_names = membership_types(company)
+    real_ids = real_type_ids(type_names)
+    bu_names = business_unit_names(company)
+    roster = seller_roster(company)
+    snapshot = compute_snapshot(company, real_ids, type_names)
+
+    result = {}
+    for year, month in months:
+        key = _month_key(year, month)
+        entry = co_cache.get(key)
+        if entry and key != current_key:
+            month_end = dt.date(year + (month == 12), month % 12 + 1, 1)
+            frozen = (today - month_end).days >= MONTH_FREEZE_DAYS and entry.get("final")
+            fresh = time.time() - entry.get("at", 0) < MONTH_RECHECK_HOURS * 3600
+            if frozen or fresh:
+                result[key] = entry["m"]
+                continue
+        if deadline and time.time() > deadline and key != current_key:
+            complete = False   # out of time - keep whatever cache we have
+            if entry:
+                result[key] = entry["m"]
+            continue
+        t0 = time.time()
+        counters = compute_month(company, year, month, real_ids, bu_names)
+        result[key] = counters
+        if key != current_key:
+            month_end = dt.date(year + (month == 12), month % 12 + 1, 1)
+            update_history(HISTORY_FILE, company, key,
+                           {"at": time.time(), "m": counters,
+                            "final": (today - month_end).days >= MONTH_FREEZE_DAYS})
+        if progress:
+            progress(company, key, time.time() - t0)
+    return result, roster, snapshot, complete
+
+
+# ---------------------------------------------------------------- public API
+def _sum_counters(dicts):
+    total = _new_counters()
+    for d in dicts:
+        total["sold"] += d["sold"]
+        total["canceled"] += d["canceled"]
+        total["checksWon"] += d["checksWon"]
+        total["jobsCompleted"] += d["jobsCompleted"]
+        for k, v in d["soldBilling"].items():
+            total["soldBilling"][k] = total["soldBilling"].get(k, 0) + v
+        for k, v in d["byBU"].items():
+            total["byBU"][k] = total["byBU"].get(k, 0) + v
+        for sid, s in d["sellers"].items():
+            t = total["sellers"].setdefault(sid, {"n": 0, "mo": 0})
+            t["n"] += s["n"]
+            t["mo"] += s["mo"]
+    return total
+
+def _kpis(c):
+    sold, jobs = c["sold"], c["jobsCompleted"]
+    monthly = c["soldBilling"].get("Monthly", 0)
+    return {
+        "sold": sold,
+        "canceled": c["canceled"],
+        "net": sold - c["canceled"],
+        "checksWon": c["checksWon"],
+        "jobsCompleted": jobs,
+        "attachRate": round(sold / jobs * 100, 1) if jobs else 0,
+        "pctSoldMonthly": round(monthly / sold * 100, 1) if sold else 0,
+        "soldBilling": c["soldBilling"],
+    }
+
+def _seller_rows(c, roster, company):
+    co = COMPANIES[company]
+    techs, csrs = [], []
+    for sid, s in c["sellers"].items():
+        info = roster.get(int(sid))
+        if info and not info["person"]:
+            continue   # answering service / system accounts
+        row = {"id": int(sid),
+               "name": info["name"] if info else "Unknown",
+               "sub": info["sub"] if info else "",
+               "company": company, "companyLabel": co["label"], "color": co["color"],
+               "sold": s["n"], "soldMonthly": s["mo"],
+               "pctMonthly": round(s["mo"] / s["n"] * 100) if s["n"] else 0}
+        (techs if info and info["kind"] == "tech" else csrs).append(row)
+    key = lambda r: (-r["sold"], -r["soldMonthly"], r["name"])
+    return sorted(techs, key=key), sorted(csrs, key=key)
+
+def _bu_rows(c):
+    return sorted(({"name": k, "n": v} for k, v in c["byBU"].items()),
+                  key=lambda b: -b["n"])[:12]
+
+def compute(time_budget_secs=None, progress=None):
+    """Full data.json payload for the dashboard."""
+    deadline = time.time() + time_budget_secs if time_budget_secs else None
+    complete = True
+
+    results = map_companies(
+        lambda co: compute_company(co, deadline=deadline, progress=progress),
+        COMPANIES)
+
+    boards = {"mtd": {}, "ytd": {}}
+    snapshot, trend = {}, {}
+    for company in COMPANIES:
+        per_month, roster, snap, ok = results[company]
+        complete = complete and ok
+        _, today = months_of_year(company)
+        current_key = _month_key(today.year, today.month)
+        snapshot[company] = snap
+        trend[company] = [{"m": k, "sold": c["sold"], "canceled": c["canceled"],
+                           "checksWon": c["checksWon"]}
+                          for k, c in sorted(per_month.items())]
+        for view, counters in (("mtd", per_month.get(current_key, _new_counters())),
+                               ("ytd", _sum_counters(per_month.values()))):
+            techs, csrs = _seller_rows(counters, roster, company)
+            boards[view][company] = {"kpis": _kpis(counters), "techs": techs,
+                                     "csrs": csrs, "byBU": _bu_rows(counters)}
+
+    # combined = sum of the three companies
+    for view in boards:
+        per_co = [boards[view][c] for c in COMPANIES]
+        kpis = {"sold": 0, "canceled": 0, "net": 0, "checksWon": 0,
+                "jobsCompleted": 0, "soldBilling": {}}
+        for b in per_co:
+            for k in ("sold", "canceled", "net", "checksWon", "jobsCompleted"):
+                kpis[k] += b["kpis"][k]
+            for k, v in b["kpis"]["soldBilling"].items():
+                kpis["soldBilling"][k] = kpis["soldBilling"].get(k, 0) + v
+        kpis["attachRate"] = (round(kpis["sold"] / kpis["jobsCompleted"] * 100, 1)
+                              if kpis["jobsCompleted"] else 0)
+        kpis["pctSoldMonthly"] = (round(kpis["soldBilling"].get("Monthly", 0)
+                                        / kpis["sold"] * 100, 1) if kpis["sold"] else 0)
+        key = lambda r: (-r["sold"], -r["soldMonthly"], r["name"])
+        boards[view]["combined"] = {
+            "kpis": kpis,
+            "techs": sorted((r for c in COMPANIES for r in boards[view][c]["techs"]), key=key),
+            "csrs": sorted((r for c in COMPANIES for r in boards[view][c]["csrs"]), key=key),
+            "byBU": [],
+        }
+
+    snapshot["combined"] = {
+        "active": sum(snapshot[c]["active"] for c in COMPANIES),
+        "billing": {k: sum(snapshot[c]["billing"].get(k, 0) for c in COMPANIES)
+                    for k in BILLING_KEYS},
+        "plans": [],
+    }
+    tot = snapshot["combined"]["active"]
+    snapshot["combined"]["pctMonthly"] = (
+        round(snapshot["combined"]["billing"].get("Monthly", 0) / tot * 100, 1) if tot else 0)
+
+    trend["combined"] = []
+    keys = sorted({row["m"] for c in COMPANIES for row in trend[c]})
+    for k in keys:
+        agg = {"m": k, "sold": 0, "canceled": 0, "checksWon": 0}
+        for c in COMPANIES:
+            for row in trend[c]:
+                if row["m"] == k:
+                    for f in ("sold", "canceled", "checksWon"):
+                        agg[f] += row[f]
+        trend["combined"].append(agg)
+
+    today = local_today("pacific")
+    return {
+        "updated": dt.datetime.now().strftime("%a %b %d %Y %H:%M:%S"),
+        "complete": complete,
+        "period": {"mtd": today.strftime("%B %Y"), "ytd": str(today.year)},
+        "companies": {c: {"label": co["label"], "color": co["color"]}
+                      for c, co in COMPANIES.items()},
+        "snapshot": snapshot,
+        "boards": boards,
+        "trend": trend,
+    }
+
+
+if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    import json as _json
+    if len(sys.argv) > 1:
+        company = sys.argv[1]
+        type_names = membership_types(company)
+        real_ids = real_type_ids(type_names)
+        bu_names = business_unit_names(company)
+        if len(sys.argv) > 2:
+            y, m = map(int, sys.argv[2].split("-"))
+        else:
+            t = local_today(COMPANIES[company]["tz"])
+            y, m = t.year, t.month
+        c = compute_month(company, y, m, real_ids, bu_names)
+        c["sellers"] = dict(sorted(c["sellers"].items(),
+                                   key=lambda kv: -kv[1]["n"])[:10])
+        print(_json.dumps(c, indent=1))
+    else:
+        data = compute()
+        for co in data["boards"]["mtd"]:
+            b = data["boards"]["mtd"][co]
+            print(co, b["kpis"], "| top tech:", b["techs"][:1], "| top csr:", b["csrs"][:1])
