@@ -392,7 +392,34 @@ async function init(){
   $("sel-emp").onchange = render;
   render();
 }
-init();
+
+// ── Access gate (hosted mode only, same code as the Command Center) ────────
+// SHA-256 of the access code. To change the code: run in the browser console
+//   crypto.subtle.digest("SHA-256",new TextEncoder().encode("NewCode")).then(b=>console.log([...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")))
+// and paste the printed hash here. Client-side deterrent only - the pay
+// section stays separately encrypted under SCORECARD_KEY regardless.
+const ACCESS_HASH = "a317cc2a63bdef8b314787da505ec86458118b1d9f87d95a6b3fa4272a582e16"; // "InterMountain2026"
+const ACCESS_KEY = "scorecard-access-v1";
+async function sha256hexGate(s){
+  const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join("");
+}
+async function gate(){
+  const local = location.protocol === "file:" ||
+    ["localhost", "127.0.0.1"].includes(location.hostname);
+  if (local || !window.isSecureContext) return true;   // only gate the hosted copy
+  if (localStorage.getItem(ACCESS_KEY) === ACCESS_HASH) return true;
+  for (;;) {
+    const code = prompt("Employee Scorecard\n\nEnter access code:");
+    if (code === null) continue;
+    if (await sha256hexGate(code.trim()) === ACCESS_HASH) {
+      localStorage.setItem(ACCESS_KEY, ACCESS_HASH);
+      return true;
+    }
+    alert("Wrong access code.");
+  }
+}
+gate().then(init);
 </script>
 </body>
 </html>
