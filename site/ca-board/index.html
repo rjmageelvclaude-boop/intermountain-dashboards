@@ -301,11 +301,12 @@ async function sha256hex(s){
 async function gate(){
   var isLocal=location.protocol!=="https:";
   if(isLocal||!window.isSecureContext)return true;
-  if(localStorage.getItem(ACCESS_KEY)===ACCESS_HASH)return true;
+  localStorage.removeItem(ACCESS_KEY); // older versions cached the unlock forever
+  if(sessionStorage.getItem(ACCESS_KEY)===ACCESS_HASH)return true; // session-scoped: code required again after the browser closes
   for(;;){
     var code=prompt("Comfort Advisor Board\n\nEnter access code:");
     if(code===null)continue;
-    if(await sha256hex(code.trim())===ACCESS_HASH){localStorage.setItem(ACCESS_KEY,ACCESS_HASH);return true}
+    if(await sha256hex(code.trim())===ACCESS_HASH){sessionStorage.setItem(ACCESS_KEY,ACCESS_HASH);return true}
     alert("Wrong access code.");
   }
 }

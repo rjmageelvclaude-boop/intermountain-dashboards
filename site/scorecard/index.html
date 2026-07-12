@@ -399,7 +399,7 @@ async function init(){
 // and paste the printed hash here. Client-side deterrent only - the pay
 // section stays separately encrypted under SCORECARD_KEY regardless.
 const ACCESS_HASH = "d8305f8a240c399b7b692b604e648533d54b1eb84105f8c9b1d3fa6a55f65120";
-const ACCESS_KEY = "scorecard-access-v1";
+const ACCESS_KEY = "cc-access-v1"; // shared with the other locked boards: one entry per session unlocks all
 async function sha256hexGate(s){
   const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
   return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join("");
@@ -408,12 +408,14 @@ async function gate(){
   const local = location.protocol === "file:" ||
     ["localhost", "127.0.0.1"].includes(location.hostname);
   if (local || !window.isSecureContext) return true;   // only gate the hosted copy
-  if (localStorage.getItem(ACCESS_KEY) === ACCESS_HASH) return true;
+  localStorage.removeItem(ACCESS_KEY);                 // older versions cached the unlock forever
+  localStorage.removeItem("scorecard-access-v1");
+  if (sessionStorage.getItem(ACCESS_KEY) === ACCESS_HASH) return true; // session-scoped: code required again after the browser closes
   for (;;) {
     const code = prompt("Employee Scorecard\n\nEnter access code:");
     if (code === null) continue;
     if (await sha256hexGate(code.trim()) === ACCESS_HASH) {
-      localStorage.setItem(ACCESS_KEY, ACCESS_HASH);
+      sessionStorage.setItem(ACCESS_KEY, ACCESS_HASH);
       return true;
     }
     alert("Wrong access code.");

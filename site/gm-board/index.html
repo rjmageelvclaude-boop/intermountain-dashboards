@@ -411,7 +411,7 @@ async function promptUnlock(){
   if (code === null) return;
   CODE = code.trim();
   const ok = await unlockCust(monthOf());
-  if (ok) { localStorage.setItem(CODE_KEY, CODE); renderTableOnly(); }
+  if (ok) { sessionStorage.setItem(CODE_KEY, CODE); renderTableOnly(); }
   else alert("That code does not unlock this report.");
 }
 
@@ -420,24 +420,27 @@ async function promptUnlock(){
 // To change the code: run in the browser console
 //   crypto.subtle.digest("SHA-256",new TextEncoder().encode("NewCode")).then(b=>console.log([...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")))
 const ACCESS_HASH = "d8305f8a240c399b7b692b604e648533d54b1eb84105f8c9b1d3fa6a55f65120";
-const ACCESS_KEY = "gm-board-access-v1";
+const ACCESS_KEY = "cc-access-v1"; // shared with the other locked boards: one entry per session unlocks all
 const CODE_KEY = "gm-board-code-v1";
 async function sha256hex(s){
   const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
   return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join("");
 }
 async function gate(){
-  CODE = localStorage.getItem(CODE_KEY) || null;
+  CODE = sessionStorage.getItem(CODE_KEY) || null;
   const local = location.protocol === "file:" || ["localhost","127.0.0.1"].includes(location.hostname);
   if (local || !window.isSecureContext) return true;   // only gate the hosted copy
-  if (localStorage.getItem(ACCESS_KEY) === ACCESS_HASH) return true;
+  localStorage.removeItem(ACCESS_KEY);                 // older versions cached the unlock (and the code) forever
+  localStorage.removeItem("gm-board-access-v1");
+  localStorage.removeItem(CODE_KEY);
+  if (sessionStorage.getItem(ACCESS_KEY) === ACCESS_HASH) return true; // session-scoped: code required again after the browser closes
   for (;;) {
     const code = prompt("Gross Margin Board\n\nEnter access code:");
     if (code === null) continue;
     if (await sha256hex(code.trim()) === ACCESS_HASH) {
-      localStorage.setItem(ACCESS_KEY, ACCESS_HASH);
+      sessionStorage.setItem(ACCESS_KEY, ACCESS_HASH);
       CODE = code.trim();
-      localStorage.setItem(CODE_KEY, CODE);
+      sessionStorage.setItem(CODE_KEY, CODE);
       return true;
     }
     alert("Wrong access code.");
