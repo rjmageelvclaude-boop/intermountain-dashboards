@@ -162,6 +162,7 @@ const money = n => n >= 1e6 ? "$" + (n / 1e6).toFixed(2) + "M"
                  : n >= 1e4 ? "$" + Math.round(n / 1e3) + "k"
                  : "$" + Math.round(n || 0).toLocaleString("en-US");
 const MEMBER_C = "#15803d", NONMEM_C = "#cbd5e1", CROSS_C = "#7c3aed";
+const SALE_BONUS = 16, RETENTION_BONUS_YR = 5;   // $ per sale / per active member per year
 
 function co() { return curBoard === "combined" ? COMBINED : DATA.companies[curBoard]; }
 
@@ -300,9 +301,28 @@ function lbHtml(rows, title, sub, emptyMsg) {
         <span class="who"><span class="ln">${r.name}</span>
           <span class="ls">${isCombined ? r.companyLabel + (r.sub ? " · " + r.sub : "") : (r.sub || "")}</span></span>
         ${r.sold > 1 ? `<span class="chip">${r.pctMonthly}% monthly</span>` : ""}
+        <span class="chip">bonus $${fmt(r.sold * SALE_BONUS)}</span>
         <span class="sold"><span class="n">${fmt(r.sold)}</span><span class="l">sold</span></span>
       </div>`).join("") : `<div class="empty">${emptyMsg}</div>`}</div>
     ${rows.length > 12 ? `<div class="more">+ ${rows.length - 12} more sellers</div>` : ""}
+  </div>`;
+}
+
+function bookLbHtml(rows, title) {
+  const top = rows.slice(0, 12);
+  const isCombined = curBoard === "combined";
+  return `<div class="lb">
+    <div class="lb-head"><span class="lb-title">${title}</span>
+      <span class="lb-sub">active members still on the books · $${RETENTION_BONUS_YR}/yr each</span></div>
+    <div class="lb-rows">${top.length ? top.map((r, i) =>
+      `<div class="lrow ${i === 0 ? "top1" : ""}" style="--co:${r.color}">
+        <span class="rank">#${i + 1}</span>
+        <span class="who"><span class="ln">${r.name}</span>
+          <span class="ls">${isCombined ? r.companyLabel + (r.sub ? " · " + r.sub : "") : (r.sub || "")}</span></span>
+        <span class="chip">$${fmt(r.bonusYr)}/yr</span>
+        <span class="sold"><span class="n">${fmt(r.book)}</span><span class="l">active</span></span>
+      </div>`).join("") : `<div class="empty">No retained members attributed yet</div>`}</div>
+    ${rows.length > 12 ? `<div class="more">+ ${rows.length - 12} more with active members</div>` : ""}
   </div>`;
 }
 
@@ -310,14 +330,19 @@ function render() {
   if (!DATA) return;
   const b = DATA.boards[curView][curBoard];
   const snap = DATA.snapshot[curBoard];
+  const bk = (DATA.book || {})[curBoard] || {techs: [], csrs: []};
   $("t-co").textContent = co().label.toUpperCase() + " – MEMBERSHIPS";
   $("t-view").textContent = curView.toUpperCase() + " · " + DATA.period[curView];
   $("board").innerHTML =
     kpisHtml(b.kpis, snap) + BELIEFS +
     `<div class="panels">${mixHtml(snap)}${trendHtml()}${revHtml(b.kpis)}${buHtml(b)}</div>` +
     `<div class="boards2">
-      ${lbHtml(b.techs, "Tech Leaderboard", "memberships sold · " + DATA.period[curView], "No tech sales yet")}
-      ${lbHtml(b.csrs, "CSR & Office Leaderboard", "memberships sold · " + DATA.period[curView], "No office sales yet")}
+      ${lbHtml(b.techs, "Tech Leaderboard", "memberships sold · " + DATA.period[curView] + " · $" + SALE_BONUS + "/sale", "No tech sales yet")}
+      ${lbHtml(b.csrs, "CSR & Office Leaderboard", "memberships sold · " + DATA.period[curView] + " · $" + SALE_BONUS + "/sale", "No office sales yet")}
+    </div>
+    <div class="boards2" style="margin-top:12px">
+      ${bookLbHtml(bk.techs, "Tech Retention Book")}
+      ${bookLbHtml(bk.csrs, "CSR & Office Retention Book")}
     </div>`;
   document.querySelectorAll("#tabs .tab").forEach(t =>
     t.classList.toggle("on", t.dataset.board === curBoard));

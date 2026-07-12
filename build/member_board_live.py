@@ -128,6 +128,7 @@ def seller_roster(company):
             continue
         roster[e["id"]] = {"name": name, "kind": "office",
                            "sub": e.get("role") or "",
+                           "active": bool(e.get("active", True)),
                            "person": not EXCLUDE_NAME.search(name)}
     for t in fetch_all(co["tenant"], "/settings/v2/tenant/{tenant}/technicians",
                        {"active": "Any"}, page_size=200, max_pages=20):
@@ -136,6 +137,7 @@ def seller_roster(company):
             continue
         roster[t["id"]] = {"name": name, "kind": "tech",
                            "sub": t.get("team") or "",
+                           "active": bool(t.get("active", True)),
                            "person": not EXCLUDE_NAME.search(name)}
     return roster
 
@@ -308,9 +310,11 @@ def compute_month(company, year, month, real_ids, bu_names):
 
 # ---------------------------------------------------------------- snapshot
 def compute_snapshot(company, real_ids, type_names):
-    """Point-in-time view of the active membership base."""
+    """Point-in-time view of the active membership base. Also tallies each
+    seller's retention book - the active members they originally sold, the
+    count their $5/yr retention bonus is paid on."""
     co = COMPANIES[company]
-    billing, by_type, total = {}, {}, 0
+    billing, by_type, book, total = {}, {}, {}, 0
     for m in fetch_all(co["tenant"], "/memberships/v2/tenant/{tenant}/memberships",
                        {"status": "Active"}, page_size=500, max_pages=100):
         tid = m.get("membershipTypeId")
@@ -320,11 +324,14 @@ def compute_snapshot(company, real_ids, type_names):
         bill = m.get("billingFrequency") or "Unknown"
         billing[bill] = billing.get(bill, 0) + 1
         by_type[tid] = by_type.get(tid, 0) + 1
+        seller = m.get("soldById")
+        if seller:
+            book[seller] = book.get(seller, 0) + 1
     plans = sorted(({"name": type_names.get(tid, "Unknown"), "n": n}
                     for tid, n in by_type.items()), key=lambda p: -p["n"])
     return {"active": total, "billing": billing,
             "pctMonthly": round(billing.get("Monthly", 0) / total * 100, 1) if total else 0,
-            "plans": plans[:12]}
+            "plans": plans[:12], "book": book}
 
 
 # ---------------------------------------------------------------- caching
@@ -440,6 +447,22 @@ def _seller_rows(c, roster, company):
     key = lambda r: (-r["sold"], -r["soldMonthly"], r["name"])
     return sorted(techs, key=key), sorted(csrs, key=key)
 
+def _book_rows(book, roster, company):
+    """Retention-book leaderboards: active members still on the books per
+    seller, restricted to people currently employed (bonus-eligible)."""
+    co = COMPANIES[company]
+    techs, csrs = [], []
+    for sid, n in book.items():
+        info = roster.get(sid)
+        if not info or not info["person"] or not info["active"]:
+            continue
+        row = {"id": sid, "name": info["name"], "sub": info["sub"],
+               "company": company, "companyLabel": co["label"], "color": co["color"],
+               "book": n, "bonusYr": 5 * n}
+        (techs if info["kind"] == "tech" else csrs).append(row)
+    key = lambda r: (-r["book"], r["name"])
+    return sorted(techs, key=key), sorted(csrs, key=key)
+
 def _bu_rows(c):
     return sorted(({"name": k, "n": v} for k, v in c["byBU"].items()),
                   key=lambda b: -b["n"])[:12]
@@ -454,12 +477,14 @@ def compute(time_budget_secs=None, progress=None):
         COMPANIES)
 
     boards = {"mtd": {}, "ytd": {}}
-    snapshot, trend = {}, {}
+    snapshot, trend, book = {}, {}, {}
     for company in COMPANIES:
         per_month, roster, snap, ok = results[company]
         complete = complete and ok
         _, today = months_of_year(company)
         current_key = _month_key(today.year, today.month)
+        b_techs, b_csrs = _book_rows(snap.pop("book", {}), roster, company)
+        book[company] = {"techs": b_techs, "csrs": b_csrs}
         snapshot[company] = snap
         trend[company] = [{"m": k, "sold": c["sold"], "canceled": c["canceled"],
                            "checksWon": c["checksWon"]}
@@ -503,6 +528,12 @@ def compute(time_budget_secs=None, progress=None):
             "byBU": [],
         }
 
+    key = lambda r: (-r["book"], r["name"])
+    book["combined"] = {
+        "techs": sorted((r for c in COMPANIES for r in book[c]["techs"]), key=key),
+        "csrs": sorted((r for c in COMPANIES for r in book[c]["csrs"]), key=key),
+    }
+
     snapshot["combined"] = {
         "active": sum(snapshot[c]["active"] for c in COMPANIES),
         "billing": {k: sum(snapshot[c]["billing"].get(k, 0) for c in COMPANIES)
@@ -533,6 +564,7 @@ def compute(time_budget_secs=None, progress=None):
                       for c, co in COMPANIES.items()},
         "snapshot": snapshot,
         "boards": boards,
+        "book": book,
         "trend": trend,
     }
 
