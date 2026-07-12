@@ -36,7 +36,9 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install --quiet cryptography   # scorecard pay encryption
+        # Pinned major: an unexpected cryptography release must not silently
+        # publish the scorecard without its pay section.
+        run: pip install --quiet "cryptography~=49.0"
 
       - name: Restore cached board histories
         uses: actions/cache/restore@v4
@@ -68,7 +70,9 @@ jobs:
           ST_SECRETS_JSON: ${{ secrets.ST_SECRETS_JSON }}
           ST_TIMEOUT: "120"
           ST_PAGE_CONCURRENCY: "4"   # concurrent pages per list fetch
-          ST_MAX_CONCURRENCY: "8"    # in-flight request cap per board process
+          # In-flight cap per board process. Boards also thread their three
+          # companies, so keep each process's slice of the API modest.
+          ST_MAX_CONCURRENCY: "6"
           # Bound each board's closed-month YTD backfill: at most this many seconds
           # per run, resuming from the cached history file on the next run.
           TECH_BOARD_BUDGET: "90"
@@ -103,7 +107,26 @@ jobs:
           wait
 
           for f in logs/*.log; do echo "::group::$f"; cat "$f"; echo "::endgroup::"; done
-          rm -rf secrets logs
+
+      - name: Clean up secrets
+        if: always()
+        run: rm -rf secrets logs
+
+      # A board whose refresh keeps failing deploys its cached data.json
+      # forever without failing the run - surface that as a warning here.
+      # mtime survives the Actions cache (tar), so it is "when a refresh
+      # last succeeded" regardless of which run wrote the file.
+      - name: Data freshness check
+        run: |
+          stale=0
+          for f in site/*/data.json; do
+            age=$(( $(date +%s) - $(stat -c %Y "$f") ))
+            if [ $age -gt 7200 ]; then
+              echo "::warning title=Stale dashboard data::$f last written $((age/60)) min ago - its refresh has been failing"
+              stale=1
+            fi
+          done
+          [ $stale -eq 0 ] && echo "All boards fresh." || true
 
       - name: Save board histories for next run
         uses: actions/cache/save@v4

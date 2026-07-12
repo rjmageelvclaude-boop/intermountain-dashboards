@@ -38,7 +38,6 @@ import json
 import os
 import re
 import sys
-import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 
@@ -47,9 +46,8 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 
 import tech_board_live as tb
-from command_center_live import fetch_all, local_today, _load_json, _save_json
-
-_hist_lock = threading.Lock()
+from command_center_live import (fetch_all, local_today, _load_json,
+                                 _save_json, update_history)
 
 HISTORY_FILE = os.path.join(ROOT, "data", "goat-board-history.json")
 SITE_DIR = os.path.join(ROOT, "site")
@@ -131,12 +129,7 @@ def compute_live_company(company, deadline=None, progress=None):
             month_end = dt.date(year + (month == 12), month % 12 + 1, 1)
             rec = {"at": time.time(), "techs": techs,
                    "final": (today - month_end).days >= tb.MONTH_FREEZE_DAYS}
-            # Companies backfill in parallel threads - reload, merge, save so
-            # one company's writes don't clobber the other's.
-            with _hist_lock:
-                merged = _load_json(HISTORY_FILE, {})
-                merged.setdefault(company, {})[key] = rec
-                _save_json(HISTORY_FILE, merged)
+            update_history(HISTORY_FILE, company, key, rec)
         if progress:
             progress(f"goat/{company}", key, time.time() - t0)
     return result, roster, complete

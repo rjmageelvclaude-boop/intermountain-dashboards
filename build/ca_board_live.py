@@ -44,7 +44,7 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 
 from command_center_live import (fetch_all, local_day_window_utc, local_today,
-                                 _load_json, _save_json)
+                                 _load_json, _save_json, map_companies)
 from call_board_live import job_type_thresholds, is_opportunity
 
 DATA_DIR = os.path.join(ROOT, "data")
@@ -441,11 +441,14 @@ def compute_company(company, log=print):
 
 
 def compute(log=print):
-    out = {"generatedAt": _now_utc_str(), "companies": {}}
-    for company in COMPANIES:
-        log(f"== {company} ==")
-        out["companies"][company] = compute_company(company, log=log)
-    return out
+    # Companies are safe to run in parallel: every cache file here is keyed
+    # by tenant (ca-board-cache-<TENANT>.json), so the threads write disjoint
+    # files. Log lines interleave with a company prefix instead of headers.
+    def one(company):
+        return compute_company(
+            company, log=lambda msg: log(f"[{company}] {msg}"))
+    return {"generatedAt": _now_utc_str(),
+            "companies": map_companies(one, COMPANIES)}
 
 
 if __name__ == "__main__":

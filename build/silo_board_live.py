@@ -56,7 +56,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 from command_center_live import (fetch_all, local_today, _load_json,
-                                 _save_json, _utc_offset_hours)
+                                 _save_json, _utc_offset_hours,
+                                 map_companies, update_history)
 from tech_board_live import (_is_memb_sku, _iso_z, _local_ts_utc,
                              month_window_utc, _local_completed_day,
                              clean_name, sold_thresholds,
@@ -322,10 +323,9 @@ def compute_company(company, deadline=None, progress=None):
         result[key] = techs
         if key != current_key:
             month_end = dt.date(year + (month == 12), month % 12 + 1, 1)
-            co_cache[key] = {"at": time.time(), "techs": techs,
-                             "final": (today - month_end).days >= MONTH_FREEZE_DAYS}
-            cache[company] = co_cache
-            _save_json(HISTORY_FILE, cache)
+            rec = {"at": time.time(), "techs": techs,
+                   "final": (today - month_end).days >= MONTH_FREEZE_DAYS}
+            update_history(HISTORY_FILE, company, key, rec)
         if progress:
             progress(company, key, time.time() - t0)
     return result, roster, complete
@@ -363,9 +363,11 @@ def compute(time_budget_secs=None, progress=None):
     deadline = time.time() + time_budget_secs if time_budget_secs else None
     boards = {"mtd": {}, "ytd": {}}
     complete = True
+    results = map_companies(
+        lambda c: compute_company(c, deadline=deadline, progress=progress), COMPANIES)
     for company, co in COMPANIES.items():
-        months, today = months_of_year(company)
-        per_month, roster, ok = compute_company(company, deadline=deadline, progress=progress)
+        _, today = months_of_year(company)
+        per_month, roster, ok = results[company]
         complete = complete and ok
         current_key = _month_key(today.year, today.month)
 

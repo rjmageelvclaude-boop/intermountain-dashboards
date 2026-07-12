@@ -154,19 +154,48 @@ def fetch_all(tenant, path, params, page_size=200, max_pages=40, retries=3):
     if not first.get("hasMore") or max_pages < 2:
         return items
     # Concurrent waves; a page past the end just comes back empty/hasMore=False.
-    next_page = 2
+    next_page, done = 2, False
     with ThreadPoolExecutor(max_workers=PAGE_CONCURRENCY) as pool:
-        while next_page <= max_pages:
+        while not done and next_page <= max_pages:
             wave = range(next_page, min(next_page + PAGE_CONCURRENCY, max_pages + 1))
-            done = False
             for r in pool.map(get_page, wave):
                 items.extend(r.get("data") or [])
                 if not r.get("hasMore"):
                     done = True
-            if done:
-                break
             next_page = wave[-1] + 1
+    if not done:
+        # Data outgrew the ceiling - numbers computed from this pull are low.
+        print(f"WARNING: {path} truncated at {max_pages} pages of {page_size} "
+              f"({len(items)} items, hasMore still true) - raise max_pages", flush=True)
     return items
+
+
+# ------------------------------------------------- parallel company helpers
+_history_lock = threading.Lock()
+
+def update_history(path, company, key, rec):
+    """Write one closed-month record into a {company: {"YYYY-MM": rec}}
+    history file. Reload-merge-save under a lock so parallel company threads
+    (and the unlucky-timing case of two of them backfilling at once) can't
+    clobber each other's entries. Months older than last year are pruned -
+    the boards only ever read the current year, so old keys are dead weight
+    that would otherwise ride the Actions cache forever."""
+    cutoff = f"{dt.date.today().year - 1:04d}-01"
+    with _history_lock:
+        cache = _load_json(path, {})
+        cache.setdefault(company, {})[key] = rec
+        for months in cache.values():
+            if isinstance(months, dict):
+                for k in [k for k in months
+                          if isinstance(k, str) and len(k) == 7 and k < cutoff]:
+                    del months[k]
+        _save_json(path, cache)
+
+def map_companies(fn, companies):
+    """{company: fn(company)} computed in parallel threads, order preserved."""
+    companies = list(companies)
+    with ThreadPoolExecutor(max_workers=len(companies)) as pool:
+        return dict(zip(companies, pool.map(fn, companies)))
 
 
 # ---------------------------------------------------------------- config cache

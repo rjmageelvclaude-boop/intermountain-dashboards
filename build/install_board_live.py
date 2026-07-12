@@ -47,7 +47,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 from command_center_live import (fetch_all, local_today, _load_json,
-                                 _save_json, _utc_offset_hours)
+                                 _save_json, _utc_offset_hours,
+                                 map_companies, update_history)
 from servicetitan_client import st_get
 from tech_board_live import (month_window_utc, _iso_z, _local_ts_utc,
                              clean_name)
@@ -145,8 +146,10 @@ def current_period_start(company):
                 continue
             if s <= now < e and (best is None or s > best):
                 best = s
-    except Exception:
-        pass
+    except Exception as e:
+        # WTD hours fall back to Monday-start; say so instead of hiding it.
+        print(f"WARNING: {company} payroll-period lookup failed ({e}) - "
+              f"using Monday fallback for WTD hours", flush=True)
     if best is not None:
         day = (best + dt.timedelta(hours=_utc_offset_hours(co["tz"], best.date()))).date()
         return min(day, today)
@@ -270,10 +273,9 @@ def compute_company(company, deadline=None, progress=None):
         result[key] = techs
         if key != current_key:
             month_end = dt.date(year + (month == 12), month % 12 + 1, 1)
-            co_cache[key] = {"at": time.time(), "techs": techs,
-                             "final": (today - month_end).days >= MONTH_FREEZE_DAYS}
-            cache[company] = co_cache
-            _save_json(HISTORY_FILE, cache)
+            rec = {"at": time.time(), "techs": techs,
+                   "final": (today - month_end).days >= MONTH_FREEZE_DAYS}
+            update_history(HISTORY_FILE, company, key, rec)
         if progress:
             progress(company, key, time.time() - t0)
     return result, roster, complete
@@ -304,15 +306,22 @@ def compute(time_budget_secs=None, progress=None):
     deadline = time.time() + time_budget_secs if time_budget_secs else None
     boards = {"mtd": {}, "ytd": {}}
     complete = True
-    for company, co in COMPANIES.items():
-        months, today = months_of_year(company)
-        per_month, roster, ok = compute_company(company, deadline=deadline, progress=progress)
-        complete = complete and ok
-        current_key = _month_key(today.year, today.month)
 
+    def one(company):
+        co = COMPANIES[company]
+        per_month, roster, ok = compute_company(company, deadline=deadline, progress=progress)
         # week-to-date OT for the current payroll period (shown on both views)
         wtd_start = current_period_start(company)
-        wtd = pay_hours(co["tenant"], wtd_start.isoformat(), today.isoformat(), roster)
+        wtd = pay_hours(co["tenant"], wtd_start.isoformat(),
+                        local_today(co["tz"]).isoformat(), roster)
+        return per_month, roster, ok, wtd
+
+    results = map_companies(one, COMPANIES)
+    for company, co in COMPANIES.items():
+        _, today = months_of_year(company)
+        per_month, roster, ok, wtd = results[company]
+        complete = complete and ok
+        current_key = _month_key(today.year, today.month)
 
         rows_mtd, rows_ytd = [], []
         for tid, info in roster.items():

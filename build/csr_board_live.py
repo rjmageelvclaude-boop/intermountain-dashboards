@@ -46,7 +46,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 from command_center_live import (fetch_all, local_today, _load_json,
-                                 _save_json, _utc_offset_hours)
+                                 _save_json, _utc_offset_hours,
+                                 map_companies, update_history)
 
 HISTORY_FILE = os.path.join(ROOT, "data", "csr-board-history.json")
 MONTH_FREEZE_DAYS = 10       # closed month is final this long after month-end
@@ -177,7 +178,7 @@ def compute_window(company, start, end, roster=None):
     # memberships sold over the phone credit the CSR via soldById
     for m in fetch_all(tenant, "/memberships/v2/tenant/{tenant}/memberships",
                        {"createdOnOrAfter": start, "createdBefore": end},
-                       page_size=200, max_pages=50):
+                       page_size=200, max_pages=200):
         seller = m.get("soldById")
         if seller in roster:
             out.setdefault(seller, _new_counters())["membSold"] += 1
@@ -239,10 +240,9 @@ def compute_company(company, deadline=None, progress=None):
         result[key] = agents
         if key != current_key:
             month_end = dt.date(year + (month == 12), month % 12 + 1, 1)
-            co_cache[key] = {"at": time.time(), "agents": agents,
-                             "final": (today - month_end).days >= MONTH_FREEZE_DAYS}
-            cache[company] = co_cache
-            _save_json(HISTORY_FILE, cache)
+            rec = {"at": time.time(), "agents": agents,
+                   "final": (today - month_end).days >= MONTH_FREEZE_DAYS}
+            update_history(HISTORY_FILE, company, key, rec)
         if progress:
             progress(company, key, time.time() - t0)
     return result, roster, complete
@@ -287,14 +287,20 @@ def compute(time_budget_secs=None, progress=None):
     deadline = time.time() + time_budget_secs if time_budget_secs else None
     boards = {"daily": {}, "mtd": {}, "ytd": {}}
     complete = True
-    for company, co in COMPANIES.items():
-        months, today = months_of_year(company)
+
+    def one(company):
         per_month, roster, ok = compute_company(company, deadline=deadline, progress=progress)
-        complete = complete and ok
-        current_key = _month_key(today.year, today.month)
         daily = compute_today(company, roster=roster)
         if progress:
             progress(company, "today", 0)
+        return per_month, roster, ok, daily
+
+    results = map_companies(one, COMPANIES)
+    for company, co in COMPANIES.items():
+        _, today = months_of_year(company)
+        per_month, roster, ok, daily = results[company]
+        complete = complete and ok
+        current_key = _month_key(today.year, today.month)
 
         def base_of(info):
             return {"id": info["id"], "name": info["name"], "role": info["role"],

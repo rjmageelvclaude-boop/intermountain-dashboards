@@ -51,7 +51,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 from command_center_live import (fetch_all, local_today, _load_json,
-                                 _save_json, _utc_offset_hours)
+                                 _save_json, _utc_offset_hours, update_history)
 import tech_board_live as tech_engine
 from tech_board_live import COMPANIES
 
@@ -218,10 +218,9 @@ def pay_months(company, deadline=None, progress=None):
         result[key] = emps
         if key != current_key:
             month_end = dt.date(today.year + (month == 12), month % 12 + 1, 1)
-            co_cache[key] = {"at": time.time(), "emps": emps,
-                             "final": (today - month_end).days >= PAY_FREEZE_DAYS}
-            cache[company] = co_cache
-            _save_json(PAY_HISTORY_FILE, cache)
+            rec = {"at": time.time(), "emps": emps,
+                   "final": (today - month_end).days >= PAY_FREEZE_DAYS}
+            update_history(PAY_HISTORY_FILE, company, key, rec)
         if progress:
             progress(company, f"pay {key}", time.time() - t0)
     return result, complete
