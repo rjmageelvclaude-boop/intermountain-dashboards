@@ -365,7 +365,7 @@ function render(){
 // SHA-256 of the access code. To change the code: run in the browser console
 //   crypto.subtle.digest("SHA-256",new TextEncoder().encode("NewCode")).then(b=>console.log([...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")))
 // and paste the printed hash here.
-const ACCESS_HASH="a317cc2a63bdef8b314787da505ec86458118b1d9f87d95a6b3fa4272a582e16"; // "InterMountain2026"
+const ACCESS_HASH="a317cc2a63bdef8b314787da505ec86458118b1d9f87d95a6b3fa4272a582e16";
 const ACCESS_KEY="cc-access-v1";
 async function sha256hex(s){
   var b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));
