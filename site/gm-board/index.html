@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Gross Margin — HVAC Install</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Montserrat','Segoe UI',system-ui,sans-serif;background:#f2f3f5;color:#111;min-height:100vh}
+.wrap{max-width:1780px;margin:0 auto;padding:14px 22px 24px}
+.topbar{display:flex;align-items:center;gap:16px;margin-bottom:12px;flex-wrap:wrap}
+.big-title{font-size:38px;font-weight:900;letter-spacing:-1px;text-transform:uppercase;line-height:1}
+.big-title small{font-size:15px;font-weight:800;color:#888;margin-left:10px;letter-spacing:0}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+.tab{cursor:pointer;user-select:none;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#555;background:#e7e9ec;border:2px solid transparent;white-space:nowrap}
+.tab:hover{color:#111;border-color:#c9ced6}
+.tab.on{background:#1663c7;color:#fff}
+.btn{cursor:pointer;border:0;background:#111;color:#fff;font:inherit;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;padding:9px 14px;border-radius:8px}
+.btn:hover{background:#333}
+
+.kpis{display:grid;grid-template-columns:repeat(8,1fr);gap:10px}
+.kpi{background:#fff;border-radius:12px;padding:13px 14px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.kpi .v{font-size:27px;font-weight:900;line-height:1.05;letter-spacing:-.5px;white-space:nowrap}
+.kpi .k{font-size:10.5px;font-weight:800;color:#8a919c;text-transform:uppercase;letter-spacing:.04em;margin-top:4px;line-height:1.2}
+.kpi .s{font-size:10.5px;font-weight:700;color:#555;margin-top:4px;line-height:1.25}
+.kpi.hero{background:#1663c7}
+.kpi.hero .v,.kpi.hero .s{color:#fff}
+.kpi.hero .k{color:rgba(255,255,255,.85)}
+.gm-good{color:#15803d}.gm-mid{color:#b45309}.gm-bad{color:#b42318}
+
+/* books reconciliation strip */
+.books{display:flex;gap:10px;align-items:center;background:#111827;color:#fff;border-radius:12px;
+  padding:10px 16px;margin:12px 0;flex-wrap:wrap;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.books .tag{font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#e0a421;white-space:nowrap;line-height:1.3}
+.books .b{flex:1;min-width:130px;text-align:center;font-size:11px;font-weight:700;color:#cbd5e1;line-height:1.25}
+.books .b b{display:block;font-size:16.5px;font-weight:900;color:#fff}
+.books .arrow{color:#4b5563;font-weight:900}
+
+.panels{display:grid;grid-template-columns:1.25fr 1.25fr 1fr 1fr;gap:12px;margin-bottom:12px}
+.panel{background:#fff;border-radius:12px;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,.08);min-height:230px;display:flex;flex-direction:column}
+.p-title{font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.05em;color:#555}
+.p-sub{font-size:10.5px;font-weight:700;color:#9aa1ab;margin-top:2px}
+
+/* month bars */
+.chart{flex:1;display:flex;align-items:flex-end;gap:6px;margin-top:16px;min-height:150px}
+.mon{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end;cursor:pointer}
+.mon .bar{width:100%;border-radius:5px 5px 0 0;position:relative;min-height:3px;background:#c9d6ea}
+.mon.on .bar{background:#1663c7}
+.mon .bv{position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:900;color:#333;white-space:nowrap}
+.mon .rv{position:absolute;bottom:3px;left:50%;transform:translateX(-50%);font-size:8.5px;font-weight:800;color:#fff;white-space:nowrap;writing-mode:vertical-rl;max-height:90%;overflow:hidden}
+.mon .ml{font-size:10px;font-weight:800;color:#9aa1ab;text-transform:uppercase}
+
+/* daily line */
+.sline{flex:1;margin-top:12px;min-height:150px}
+.sline svg{width:100%;height:100%}
+
+/* segment rows */
+.seglist{margin-top:12px;display:flex;flex-direction:column;gap:9px}
+.segrow{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700}
+.segrow .sn{width:64px;white-space:nowrap}
+.segrow .track{flex:1;height:16px;background:#eef0f3;border-radius:4px;overflow:hidden}
+.segrow .fill{height:100%;border-radius:4px;min-width:2px}
+.segrow .gmn{width:52px;text-align:right;font-weight:900}
+.segrow .sub{width:96px;text-align:right;color:#9aa1ab;font-size:10.5px}
+
+/* jobs table */
+.tablecard{background:#fff;border-radius:12px;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.t-head{display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+.t-title{font-size:17px;font-weight:900;text-transform:uppercase;letter-spacing:-.3px}
+.t-sub{font-size:10.5px;font-weight:700;color:#9aa1ab}
+#search{margin-left:auto;border:2px solid #e7e9ec;border-radius:8px;padding:7px 10px;font:inherit;font-size:12px;font-weight:700;width:220px}
+.tscroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:11.5px}
+th{font-size:9.5px;font-weight:900;text-transform:uppercase;letter-spacing:.03em;color:#8a919c;
+  text-align:right;padding:6px 7px;border-bottom:2px solid #e7e9ec;white-space:nowrap;cursor:pointer;user-select:none;position:sticky;top:0;background:#fff}
+th.l,td.l{text-align:left}
+th.on{color:#1663c7}
+td{padding:5px 7px;border-bottom:1px solid #f0f1f3;text-align:right;font-weight:700;white-space:nowrap}
+td.l{font-weight:700}
+td.cust{max-width:210px;overflow:hidden;text-overflow:ellipsis}
+td.typ{max-width:200px;overflow:hidden;text-overflow:ellipsis;color:#555}
+td.neg{color:#b42318}
+tr:hover td{background:#f7f9fc}
+tr.tot td{border-top:2px solid #111;border-bottom:0;font-weight:900;background:#f5f6f8}
+.chip{display:inline-block;font-size:9px;font-weight:800;border-radius:5px;padding:2px 6px;background:#e7e9ec;color:#555}
+.chip.Costco{background:#fdeaea;color:#b42318}
+.chip.TGL{background:#e7f0fc;color:#1663c7}
+.chip.LTO{background:#fef3e2;color:#b45309}
+.gmcell{font-weight:900}
+
+.footer{margin-top:12px;display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:#999;flex-wrap:wrap;gap:6px}
+.warn-note{color:#b45309}
+.empty{padding:40px 0;text-align:center;font-size:15px;font-weight:800;color:#999}
+@media(max-width:1400px){.kpis{grid-template-columns:repeat(4,1fr)}.panels{grid-template-columns:1fr 1fr}}
+@media(max-width:700px){.kpis{grid-template-columns:1fr 1fr}.panels{grid-template-columns:1fr}.big-title{font-size:26px}}
+@media print{
+  body{background:#fff}
+  .tabs,.btn,#search,.footer,.panels{display:none}
+  .wrap{padding:0;max-width:none}
+  .kpi,.tablecard,.books{box-shadow:none;border:1px solid #ddd}
+  .books{background:#fff;color:#111}.books .b{color:#333}.books .b b{color:#111}.books .tag{color:#b45309}
+  table{font-size:9.5px}
+  td,th{padding:3px 5px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="big-title">GROSS MARGIN<small id="t-sub">HVAC INSTALL · SIERRA</small></div>
+    <div class="tabs" id="tabs"></div>
+    <button class="btn" onclick="window.print()">Print report</button>
+  </div>
+  <div id="board"><div class="empty">Waiting for data…</div></div>
+  <div class="footer">
+    <span id="updated"></span>
+    <span id="note"></span>
+  </div>
+</div>
+<script>
+"use strict";
+const RELOAD_MINS = 5;
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const SEG_C = {Costco:"#b42318", TGL:"#1663c7", LTO:"#b45309", Direct:"#15803d"};
+let DATA = null, curKey = null, sortCol = "d", sortDir = 1, query = "";
+
+const $ = id => document.getElementById(id);
+const fmt = n => Math.round(n || 0).toLocaleString("en-US");
+const money = n => "$" + fmt(n);
+const moneyK = n => Math.abs(n) >= 1e6 ? "$" + (n/1e6).toFixed(2) + "M" : "$" + fmt(n/1e3) + "k";
+const pct = n => (n*100).toFixed(1) + "%";
+const gmClass = g => g >= .55 ? "gm-good" : g >= .45 ? "gm-mid" : "gm-bad";
+const monthOf = () => DATA.months.find(m => m.key === curKey) || DATA.months[DATA.months.length-1];
+
+function kpisHtml(s) {
+  const discPct = s.list ? -s.disc / s.list * 100 : 0;
+  const isCurrent = curKey === DATA.current;
+  return `<div class="kpis">
+    <div class="kpi hero"><div class="v">${pct(s.reportGm)}</div><div class="k">Gross Margin — report</div>
+      <div class="s">${isCurrent ? "reads high early — Costco fees, financing fees and pay post with a lag" : "hand-report formula · $" + DATA.flatOverhead + "/job overhead"}</div></div>
+    <div class="kpi"><div class="v ${gmClass(s.estBookGm + .07)}">${pct(s.estBookGm)}</div><div class="k">Est. book GM</div>
+      <div class="s">financial-statement convention</div></div>
+    <div class="kpi"><div class="v">${s.n}</div><div class="k">Installs</div>
+      <div class="s">completed · revenue-bearing</div></div>
+    <div class="kpi"><div class="v">${moneyK(s.total)}</div><div class="k">Revenue</div>
+      <div class="s">avg ticket ${money(s.avgTicket)}</div></div>
+    <div class="kpi"><div class="v">${moneyK(-s.disc)}</div><div class="k">Discounts</div>
+      <div class="s">${discPct.toFixed(1)}% off list of ${moneyK(s.list)}</div></div>
+    <div class="kpi"><div class="v">${moneyK(s.perf)}</div><div class="k">Performance Pay</div>
+      <div class="s">${pct(s.total ? s.perf/s.total : 0)} of revenue · adj ${money(s.padj)}</div></div>
+    <div class="kpi"><div class="v">${moneyK(s.cost)}</div><div class="k">PO Costs</div>
+      <div class="s">${pct(s.total ? s.cost/s.total : 0)} of revenue · returns ${money(s.ret)}</div></div>
+    <div class="kpi"><div class="v">${moneyK(s.costco + s.fin)}</div><div class="k">Costco + Finance Fees</div>
+      <div class="s">Costco ${moneyK(s.costco)} · financing ${moneyK(s.fin)}</div></div>
+  </div>`;
+}
+
+function booksHtml(s) {
+  return `<div class="books">
+    <span class="tag">Books view<br>P&amp;L convention</span>
+    <div class="b"><b>${moneyK(s.list)}</b>gross revenue</div><span class="arrow">−</span>
+    <div class="b"><b>${moneyK(-s.disc + s.rebate)}</b>discounts + Costco rebates</div><span class="arrow">−</span>
+    <div class="b"><b>${moneyK(s.fin)}</b>finance fees</div><span class="arrow">=</span>
+    <div class="b"><b>${moneyK(s.netRev)}</b>net revenue</div><span class="arrow">−</span>
+    <div class="b"><b>${moneyK(s.jobCogs)}</b>job COGS</div><span class="arrow">=</span>
+    <div class="b"><b>${pct(s.jobGmPct)}</b>job-costed GM</div><span class="arrow">−</span>
+    <div class="b"><b>${(DATA.overheadRate*100).toFixed(1)}%</b>non-job COGS<br>(taxes, warranty, shop)</div><span class="arrow">≈</span>
+    <div class="b"><b>${pct(s.estBookGm)}</b>est. book GM</div>
+  </div>`;
+}
+
+function trendHtml() {
+  const ms = DATA.months;
+  const maxGm = Math.max(...ms.map(m => m.summary.reportGm), .01);
+  return `<div class="panel">
+    <div class="p-title">Gross margin by month</div>
+    <div class="p-sub">report GM% · bar labels show revenue · click a month</div>
+    <div class="chart">${ms.map(m => {
+      const mi = parseInt(m.key.slice(5),10)-1, s = m.summary;
+      return `<div class="mon ${m.key===curKey?"on":""}" onclick="pick('${m.key}')">
+        <div class="bar" style="height:${s.reportGm/maxGm*100}%">
+          <span class="bv">${pct(s.reportGm)}</span>
+          <span class="rv">${moneyK(s.total)}</span>
+        </div><div class="ml">${MONTHS[mi]}</div></div>`;
+    }).join("")}</div>
+  </div>`;
+}
+
+function dailyHtml(s, label) {
+  const d = s.daily || [];
+  if (d.length < 2) return `<div class="panel"><div class="p-title">GM% through the month</div><div class="empty">Not enough days yet</div></div>`;
+  const W = 560, H = 190, P = 28;
+  const gms = d.map(p => p.gm);
+  const lo = Math.min(...gms) - .02, hi = Math.max(...gms) + .02;
+  const x = i => P + i / (d.length-1) * (W - P - 8);
+  const y = g => H - 18 - (g - lo) / (hi - lo) * (H - 34);
+  const line = d.map((p,i) => `${i?"L":"M"}${x(i).toFixed(1)},${y(p.gm).toFixed(1)}`).join(" ");
+  const last = d[d.length-1];
+  const gridLines = [];
+  for (let g = Math.ceil(lo*20)/20; g <= hi; g += .05)
+    gridLines.push(`<line x1="${P}" y1="${y(g)}" x2="${W-8}" y2="${y(g)}" stroke="#eef0f3"/>
+      <text x="${P-4}" y="${y(g)+3}" font-size="9" font-weight="700" fill="#9aa1ab" text-anchor="end">${Math.round(g*100)}%</text>`);
+  return `<div class="panel">
+    <div class="p-title">GM% through ${label}</div>
+    <div class="p-sub">cumulative report GM% by completion day · now ${pct(last.gm)} on ${moneyK(last.rev)}</div>
+    <div class="sline"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+      ${gridLines.join("")}
+      <path d="${line}" fill="none" stroke="#1663c7" stroke-width="2.5"/>
+      <circle cx="${x(d.length-1)}" cy="${y(last.gm)}" r="4" fill="#1663c7"/>
+    </svg></div>
+  </div>`;
+}
+
+function segsHtml(s) {
+  const maxT = Math.max(...s.segs.map(g => g.total), 1);
+  return `<div class="panel">
+    <div class="p-title">By segment</div>
+    <div class="p-sub">where the margin is — Costco carries the fee</div>
+    <div class="seglist">${s.segs.map(g => `
+      <div class="segrow"><span class="sn">${g.name}</span>
+        <span class="track"><span class="fill" style="display:block;width:${g.total/maxT*100}%;background:${SEG_C[g.name]||"#94a3b8"}"></span></span>
+        <span class="gmn ${gmClass(g.gm)}">${pct(g.gm)}</span>
+        <span class="sub">${g.n} jobs · ${moneyK(g.total)}</span></div>`).join("")}</div>
+    <div class="p-title" style="margin-top:16px">Top job types</div>
+    <div class="seglist">${s.types.slice(0,5).map(g => `
+      <div class="segrow"><span class="sn" style="width:170px;overflow:hidden;text-overflow:ellipsis" title="${g.name}">${g.name.replace("Install ","")}</span>
+        <span class="track"><span class="fill" style="display:block;width:${g.total/maxT*100}%;background:#94a3b8"></span></span>
+        <span class="gmn ${gmClass(g.gm)}">${pct(g.gm)}</span>
+        <span class="sub">${g.n} · ${moneyK(g.total)}</span></div>`).join("")}</div>
+  </div>`;
+}
+
+function soldByHtml(s) {
+  const rows = (s.soldBy || []).filter(r => r.name !== "—").slice(0, 10);
+  const maxT = Math.max(...rows.map(r => r.total), 1);
+  return `<div class="panel">
+    <div class="p-title">By salesperson</div>
+    <div class="p-sub">sold revenue and the margin it lands at</div>
+    <div class="seglist">${rows.length ? rows.map(r => `
+      <div class="segrow"><span class="sn" style="width:130px;overflow:hidden;text-overflow:ellipsis" title="${r.name}">${r.name}</span>
+        <span class="track"><span class="fill" style="display:block;width:${r.total/maxT*100}%;background:#1663c7"></span></span>
+        <span class="gmn ${gmClass(r.gm)}">${pct(r.gm)}</span>
+        <span class="sub">${r.n} · ${moneyK(r.total)}</span></div>`).join("")
+      : `<div class="empty">No attributed sales</div>`}</div>
+  </div>`;
+}
+
+const COLS = [
+  ["d","Date","l"],["id","Job #",""],["type","Job Type","l"],["seg","Seg","l"],
+  ["cust","Customer","l"],["sold","Sold By","l"],
+  ["total","Total",""],["list","List",""],["disc","Discount",""],
+  ["perf","Perf Pay",""],["padj","Pay Adj",""],["cost","PO Cost",""],
+  ["ret","Returns",""],["costco","Costco Fee",""],["fin","Fin Fee",""],["gm","GM %",""]];
+
+function tableHtml(m) {
+  const q = query.toLowerCase();
+  const cmap = m._cust || null;   // decrypted {jobId: customer}, if unlocked
+  const hasCust = !!(cmap || m.custEnc);   // no names published -> no column
+  const cols = COLS.filter(([k]) => hasCust || k !== "cust");
+  let rows = m.jobs.map(r => ({...r, cust: cmap ? (cmap[r.id] || "") : null}));
+  rows = rows.filter(r => !q || ((r.cust || "") + " " + r.sold + " " + r.type + " " + r.id).toLowerCase().includes(q));
+  rows = rows.sort((a,b) => {
+    const va = a[sortCol] ?? "", vb = b[sortCol] ?? "";
+    return (typeof va === "string" ? va.localeCompare(vb) : va - vb) * sortDir;
+  });
+  const S = k => rows.reduce((t,r) => t + r[k], 0);
+  const mny = (v, cls="") => `<td class="${cls}${v<0?" neg":""}">${v ? fmt(v) : "—"}</td>`;
+  return `<div class="tablecard">
+    <div class="t-head">
+      <span class="t-title">${m.label} — job by job</span>
+      <span class="t-sub">${rows.length} of ${m.jobs.length} installs · replaces the monthly hand-made workbook</span>
+      <input id="search" placeholder="Search customer, rep, type…" value="${query.replace(/"/g,"&quot;")}">
+    </div>
+    <div class="tscroll"><table>
+      <thead><tr>${cols.map(([k,label,cls]) => {
+        if (k === "cust" && m.custEnc && !cmap)
+          return `<th class="l" onclick="promptUnlock()" title="Customer names are encrypted — click to unlock with the access code">${label} 🔒</th>`;
+        return `<th class="${cls}${sortCol===k?" on":""}" onclick="sortBy('${k}')">${label}${sortCol===k?(sortDir>0?" ▲":" ▼"):""}</th>`;
+      }).join("")}</tr></thead>
+      <tbody>
+      ${rows.map(r => `<tr>
+        <td class="l">${r.d.slice(5)}</td>
+        <td>${r.id}</td>
+        <td class="l typ" title="${r.type}">${r.type}</td>
+        <td class="l"><span class="chip ${r.seg}">${r.seg}</span></td>
+        ${hasCust ? `<td class="l cust" title="${r.cust || ""}">${r.cust !== null ? (r.cust || "—") : "🔒"}</td>` : ""}
+        <td class="l">${r.sold || "—"}</td>
+        <td><b>${fmt(r.total)}</b></td>
+        ${mny(r.list)}${mny(r.disc)}${mny(r.perf)}${mny(r.padj)}${mny(r.cost)}${mny(r.ret)}${mny(r.costco)}${mny(r.fin)}
+        <td class="gmcell ${gmClass(r.gm)}">${pct(r.gm)}</td>
+      </tr>`).join("")}
+      <tr class="tot">
+        <td class="l">TOTAL</td><td></td><td class="l"></td><td></td>${hasCust ? `<td class="l">${rows.length} jobs</td>` : ""}<td class="l">${hasCust ? "" : rows.length + " jobs"}</td>
+        <td>${fmt(S("total"))}</td><td>${fmt(S("list"))}</td><td class="neg">${fmt(S("disc"))}</td>
+        <td>${fmt(S("perf"))}</td><td>${fmt(S("padj"))}</td><td>${fmt(S("cost"))}</td>
+        <td>${fmt(S("ret"))}</td><td>${fmt(S("costco"))}</td><td>${fmt(S("fin"))}</td>
+        <td class="gmcell">${rows.length ? pct((S("total") - S("perf") - S("padj") - S("cost") - S("ret") - S("costco") - S("fin") - DATA.flatOverhead*rows.length) / S("total")) : "—"}</td>
+      </tr>
+      </tbody>
+    </table></div>
+  </div>`;
+}
+
+function render() {
+  if (!DATA) return;
+  const m = monthOf();
+  if (!m) { $("board").innerHTML = `<div class="empty">No months computed yet — first refresh is backfilling.</div>`; return; }
+  if (m.custEnc && !m._cust && CODE) unlockCust(m).then(ok => { if (ok) renderTableOnly(); });
+  const s = m.summary;
+  $("t-sub").textContent = "HVAC INSTALL · SIERRA · " + m.label.toUpperCase();
+  $("board").innerHTML = kpisHtml(s) + booksHtml(s) +
+    `<div class="panels">${trendHtml()}${dailyHtml(s, m.label.split(" ")[0])}${segsHtml(s)}${soldByHtml(s)}</div>` +
+    tableHtml(m);
+  const inp = $("search");
+  inp.oninput = () => { query = inp.value; renderTableOnly(); };
+  document.querySelectorAll("#tabs .tab").forEach(t => t.classList.toggle("on", t.dataset.key === m.key));
+  $("updated").textContent = "Updated " + DATA.updated + " (live ServiceTitan API) · books view calibrated to the June 2026 financial statements";
+  $("note").textContent = DATA.complete ? "" : "Backfill in progress — earlier months will appear within the hour.";
+  $("note").className = DATA.complete ? "" : "warn-note";
+}
+
+function renderTableOnly() {
+  const card = document.querySelector(".tablecard");
+  if (!card) return;
+  const tmp = document.createElement("div");
+  tmp.innerHTML = tableHtml(monthOf());
+  card.replaceWith(tmp.firstElementChild);
+  const inp = $("search");
+  inp.oninput = () => { query = inp.value; renderTableOnly(); };
+  inp.focus();
+  inp.setSelectionRange(inp.value.length, inp.value.length);
+}
+
+function sortBy(k) {
+  if (sortCol === k) sortDir = -sortDir; else { sortCol = k; sortDir = k === "d" || typeof (monthOf().jobs[0]||{})[k] === "string" ? 1 : -1; }
+  renderTableOnly();
+}
+function pick(key) { curKey = key; render(); }
+
+function buildTabs() {
+  $("tabs").innerHTML = DATA.months.map(m => {
+    const mi = parseInt(m.key.slice(5),10)-1;
+    return `<div class="tab" data-key="${m.key}">${MONTHS[mi]} ${m.key.slice(2,4)}</div>`;
+  }).join("");
+  document.querySelectorAll("#tabs .tab").forEach(t => t.onclick = () => pick(t.dataset.key));
+}
+
+async function load() {
+  try {
+    const r = await fetch("data.json?" + Date.now());
+    if (!r.ok) throw new Error(r.status);
+    DATA = await r.json();
+    if (!curKey) curKey = DATA.current;
+    buildTabs();
+    render();
+  } catch (e) {
+    if (!DATA) $("board").innerHTML = `<div class="empty">Could not load data.json (${e.message})</div>`;
+  }
+}
+setInterval(load, RELOAD_MINS * 60 * 1000);
+
+// ── Customer-name decryption ────────────────────────────────────────────────
+// Customer names ship only as an AES-256-GCM blob per month (public repo +
+// public Pages), and only when the GM_BOARD_KEY secret is configured on the
+// refresh. The viewer unlocks the column with that report key (tried
+// automatically if it matches the gate code they already typed).
+let CODE = null;
+async function decryptBlob(blob, pass){
+  const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+  const km = await crypto.subtle.importKey("raw", new TextEncoder().encode(pass), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey(
+    {name: "PBKDF2", salt: b64(blob.salt), iterations: blob.iter, hash: "SHA-256"},
+    km, {name: "AES-GCM", length: 256}, false, ["decrypt"]);
+  const pt = await crypto.subtle.decrypt(
+    {name: "AES-GCM", iv: b64(blob.nonce), additionalData: new TextEncoder().encode(blob.aad)},
+    key, b64(blob.ct));
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+async function unlockCust(m){
+  if (!m || !m.custEnc || m._cust || !CODE || !window.crypto?.subtle) return false;
+  try { m._cust = await decryptBlob(m.custEnc, CODE); return true; }
+  catch (e) { return false; }
+}
+async function promptUnlock(){
+  const code = prompt("Enter the report key to unlock customer names:");
+  if (code === null) return;
+  CODE = code.trim();
+  const ok = await unlockCust(monthOf());
+  if (ok) { localStorage.setItem(CODE_KEY, CODE); renderTableOnly(); }
+  else alert("That code does not unlock this report.");
+}
+
+// ── Access gate (hosted mode only, same code as the Command Center) ────────
+// SHA-256 of the access code (never put the code itself in this public file).
+// To change the code: run in the browser console
+//   crypto.subtle.digest("SHA-256",new TextEncoder().encode("NewCode")).then(b=>console.log([...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")))
+const ACCESS_HASH = "a317cc2a63bdef8b314787da505ec86458118b1d9f87d95a6b3fa4272a582e16";
+const ACCESS_KEY = "gm-board-access-v1";
+const CODE_KEY = "gm-board-code-v1";
+async function sha256hex(s){
+  const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join("");
+}
+async function gate(){
+  CODE = localStorage.getItem(CODE_KEY) || null;
+  const local = location.protocol === "file:" || ["localhost","127.0.0.1"].includes(location.hostname);
+  if (local || !window.isSecureContext) return true;   // only gate the hosted copy
+  if (localStorage.getItem(ACCESS_KEY) === ACCESS_HASH) return true;
+  for (;;) {
+    const code = prompt("Gross Margin Board\n\nEnter access code:");
+    if (code === null) continue;
+    if (await sha256hex(code.trim()) === ACCESS_HASH) {
+      localStorage.setItem(ACCESS_KEY, ACCESS_HASH);
+      CODE = code.trim();
+      localStorage.setItem(CODE_KEY, CODE);
+      return true;
+    }
+    alert("Wrong access code.");
+  }
+}
+gate().then(load);
+</script>
+</body>
+</html>
