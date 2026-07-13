@@ -26,7 +26,7 @@ Metric definitions (validated against the old report-based feed):
                         recalls, QA, drywall, finish jobs excluded); same-day =
                         install job also CREATED that day (sold + installed same day)
   - install callbacks = return trips ON TODAY'S BOARD to a location with an
-                        install completed in the last 30 days - installs AND the
+                        install completed in the last 90 days - installs AND the
                         return trips count in any department (service techs run
                         both at RUS/ULT and for plumbing); drywall/QA/permit/
                         finish/startup excluded; >2 total trips = CODE PINK
@@ -114,7 +114,7 @@ INSTALL_BUCKETS = ("hvac_install", "plumb_install")
 # Install callbacks: any return job at the install's location that is NOT an
 # expected follow-up (drywall patch, QA walk, permit inspection, finish/startup
 # visits). Recall/Warranty counts as a callback.
-CALLBACK_LOOKBACK_DAYS = 30
+CALLBACK_LOOKBACK_DAYS = 90
 _CALLBACK_EXEMPT = re.compile(
     r"drywall|quality assurance|q\s*/\s*a|\bqa\b|permit|inspection|finish|start\s*up|job walk", re.I)
 
