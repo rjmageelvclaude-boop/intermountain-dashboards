@@ -206,6 +206,16 @@ function metricList(co, weeks) {
   return M.filter(x => (!x.plumb || co.plumb) && (!x.costco || co.costco));
 }
 
+// A week opens for review Sunday at noon Pacific — managers preview the
+// Monday report a day early while the final Sunday data is still landing.
+// Ranks and "vs prev" still compare against closed weeks only.
+function reviewable(w) {
+  if (w.ended) return true;
+  const now = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Los_Angeles"}));
+  const [y, mo, d] = w.to.split("-").map(Number);
+  return now >= new Date(y, mo - 1, d, 12, 0, 0);
+}
+
 // rank of week idx among ended weeks 0..idx (1 = best); manual metrics
 // rank only among weeks that have a value (val() == null means "not keyed")
 function rankOf(metric, weeks, idx) {
@@ -322,9 +332,9 @@ function tile(metric, weeks, idx) {
 function render() {
   const co = DATA.companies[curCo];
   const weeks = co.weeks;
-  const ended = weeks.filter(w => w.ended);
-  if (!ended.length) { $("board").innerHTML = `<div class="empty sec wide">No completed weeks yet.</div>`; return; }
-  if (!curWk || !weeks.some(w => w.key === curWk && w.ended)) curWk = ended[ended.length - 1].key;
+  const viewable = weeks.filter(reviewable);
+  if (!viewable.length) { $("board").innerHTML = `<div class="empty sec wide">No completed weeks yet.</div>`; return; }
+  if (!curWk || !weeks.some(w => w.key === curWk && reviewable(w))) curWk = viewable[viewable.length - 1].key;
   const idx = weeks.findIndex(w => w.key === curWk);
   const w = weeks[idx];
   const co_ = {key: curCo, ...co};
@@ -334,7 +344,8 @@ function render() {
   document.body.style.setProperty("--co", co.color);
   $("t-co").textContent = co.label;
   $("sub").textContent = `${w.label} · ${w.range} · ranked against all ${rankOf(M.stRate, weeks, idx).n} weeks since 5/1` +
-    (w.days < 7 ? " · partial week" : "");
+    (w.days < 7 ? " · partial week" : "") +
+    (w.ended ? "" : " · IN PROGRESS — numbers update every ~10 min through Sunday close");
 
   const T = (id) => tile(M[id], weeks, idx);
   const wkPlan = (perDay) => perDay ? perDay * w.weekdays : null;
@@ -516,15 +527,15 @@ function buildNav() {
   $("tabs").innerHTML = CO_ORDER.filter(k => DATA.companies[k]).map(k =>
     `<div class="tab ${k === curCo ? "on" : ""}" data-co="${k}" style="--tabco:${DATA.companies[k].color}">${DATA.companies[k].label}</div>`).join("");
   document.querySelectorAll(".tab").forEach(t => t.onclick = () => { curCo = t.dataset.co; buildNav(); render(); });
-  const ended = co.weeks.filter(w => w.ended);
-  if (!curWk || !ended.some(w => w.key === curWk)) curWk = ended.length ? ended[ended.length - 1].key : null;
-  $("wksel").innerHTML = ended.map(w =>
-    `<option value="${w.key}" ${w.key === curWk ? "selected" : ""}>${w.label} · ${w.range}</option>`).join("");
+  const viewable = co.weeks.filter(reviewable);
+  if (!curWk || !viewable.some(w => w.key === curWk)) curWk = viewable.length ? viewable[viewable.length - 1].key : null;
+  $("wksel").innerHTML = viewable.map(w =>
+    `<option value="${w.key}" ${w.key === curWk ? "selected" : ""}>${w.label} · ${w.range}${w.ended ? "" : " · in progress"}</option>`).join("");
   $("wksel").onchange = () => { curWk = $("wksel").value; buildNav(); render(); };
   $("prev").onclick = () => step(-1); $("next").onclick = () => step(1);
   function step(d) {
-    const i = ended.findIndex(w => w.key === curWk);
-    if (i + d >= 0 && i + d < ended.length) { curWk = ended[i + d].key; buildNav(); render(); }
+    const i = viewable.findIndex(w => w.key === curWk);
+    if (i + d >= 0 && i + d < viewable.length) { curWk = viewable[i + d].key; buildNav(); render(); }
   }
 }
 
