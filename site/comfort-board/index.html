@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Comfort Report</title>
+<title>CASPR</title>
 <style>
 :root{
   --page:#f4f6f9; --surface:#ffffff; --surface2:#f1f3f7; --ink:#17212f; --muted:#687382; --faint:#98a2b3;
@@ -113,7 +113,7 @@ table.g .dim{color:var(--faint)}
 </head>
 <body>
 <div class="wrap" id="app">
-<div style="display:flex;justify-content:center;align-items:center;height:80vh;color:var(--faint)"><div style="text-align:center"><div style="font-size:32px;margin-bottom:12px">&#128202;</div><div style="font-size:14px;font-weight:600">Loading Comfort Report...</div></div></div>
+<div style="display:flex;justify-content:center;align-items:center;height:80vh;color:var(--faint)"><div style="text-align:center"><div style="font-size:32px;margin-bottom:12px">&#128202;</div><div style="font-size:14px;font-weight:600">Loading CASPR...</div></div></div>
 </div>
 <script>
 // Monthly plan inputs (workdays, budgeted calls, close % and average tickets
@@ -377,7 +377,7 @@ function techsForDay(iso){
 function topbar(){
   var gen=data&&data.generatedAt?new Date(data.generatedAt).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}):"?";
   return'<div class="topbar">'+
-    '<div class="wordmark">Comfort Report<small>'+monthName()+' &middot; InterMountain Live Board</small></div>'+
+    '<div class="wordmark">CASPR<small>'+monthName()+' &middot; Comfort Report &middot; InterMountain Live Board</small></div>'+
     '<div class="tabs co-tabs">'+COS.map(function(c){
       return'<span class="tab'+(c===co?" on":"")+'" tabindex="0" onclick="setCo(\''+c+'\')">'+c.charAt(0).toUpperCase()+c.slice(1)+'</span>';
     }).join("")+'</div>'+
@@ -651,7 +651,7 @@ async function gate(){
   if(isLocal||!window.isSecureContext)return true;
   if(sessionStorage.getItem(ACCESS_KEY)===ACCESS_HASH)return true;
   for(;;){
-    var code=prompt("Comfort Report\n\nEnter access code:");
+    var code=prompt("CASPR\n\nEnter access code:");
     if(code===null)continue;
     if(await sha256hex(code.trim())===ACCESS_HASH){sessionStorage.setItem(ACCESS_KEY,ACCESS_HASH);return true}
     alert("Wrong access code.");
