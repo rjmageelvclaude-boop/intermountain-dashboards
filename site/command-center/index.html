@@ -330,6 +330,32 @@ function render(){
   var whL=act==="sierra"?"Sold":"Installed";
   if(co.plumb){pB=mrow("Maintenance on Board",g("plumbMaintenanceOnBoard"),"#",undefined,"plumbMaintenanceOnBoard")+mrow("Maintenance Ran",g("plumbMaintenanceRan"),"#",undefined,"plumbMaintenanceRan")+mrow("Demand on Board",g("plumbDemandOnBoard"),"#",undefined,"plumbDemandOnBoard")+mrow("Demand Ran",g("plumbDemandRan"),"#",undefined,"plumbDemandRan")+mrow("Total Revenue",g("plumbRevenue"),"$",undefined,"plumbRevenue")+mrow("Total Sales",g("plumbSales"),"$",undefined,"plumbSales")+mrow("Average Ticket",plumbAvg,"$",undefined,null)+mrow("Memberships Sold",g("plumbMembershipsSold"),"#",undefined,"plumbMembershipsSold")+mrow("Tankless "+whL,g("plumbTanklessSold"),"#",undefined,"plumbTanklessSold")+mrow("Filtration "+whL,g("plumbFiltrationSold"),"#",undefined,"plumbFiltrationSold")+mrow("Tanks "+whL,g("plumbTanksSold"),"#",undefined,"plumbTanksSold")}
 
+  // Installs: board counts per day + the callback watchlist (live-only)
+  var instB=mrow("Installs on Board",g("installsOnBoard"),"#",undefined,"installsOnBoard");
+  if(g("plumbInstallsOnBoard")>0||act==="sierra"){instB+=mrow("&nbsp;&nbsp;HVAC",g("hvacInstallsOnBoard"),"#",undefined,"hvacInstallsOnBoard")+mrow("&nbsp;&nbsp;Plumbing",g("plumbInstallsOnBoard"),"#",undefined,"plumbInstallsOnBoard")}
+  instB+=mrow("Installs Completed",g("installsCompleted"),"#",undefined,"installsCompleted")+mrow("Same-Day Installs (sold today)",g("installsSameDay"),"#",undefined,"installsSameDay");
+  var cbData=sd[act]||{},cbList=cbData.installCallbacks||[],cbAlerts=cbData.installCallbackAlerts||0;
+  function fmtDay(s){if(!s)return"?";var p=s.split("-");return(+p[1])+"/"+(+p[2])}
+  var cbB="";
+  if(!viewDate){
+    cbB=divd("Callbacks — installs completed last "+(cbData.installCallbackWindowDays||30)+" days");
+    if(!cbList.length){cbB+='<div class="metric-row"><div class="dot" style="background:#16a34a"></div><div class="m-label" style="color:#16a34a;font-weight:600">No install callbacks 🎉</div></div>'}
+    else{
+      cbB+='<div style="max-height:300px;overflow-y:auto">';
+      cbList.forEach(function(r){
+        var tip=(r.trips||[]).map(function(t){return fmtDay(t.day)+" — "+t.type+" (#"+t.jobNumber+")"}).join("\n");
+        cbB+='<div class="metric-row" style="'+(r.ohShit?"background:rgba(239,68,68,.09)":"")+'" title="'+tip.replace(/"/g,"&quot;")+'">'
+          +'<div class="dot" style="background:'+(r.ohShit?"#ef4444":r.callbacks>1?"#eab308":"#cbd5e1")+'"></div>'
+          +'<div class="m-label" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">#'+r.jobNumber+' · '+r.installType+'<span style="color:#94a3b8"> · inst '+fmtDay(r.installedOn)+'</span></div>'
+          +'<div class="m-val" style="width:auto;font-size:12px;white-space:nowrap;color:'+(r.ohShit?"#ef4444":"#475569")+'">'+r.callbacks+' trip'+(r.callbacks>1?"s":"")+' back'+(r.ohShit?' 🚨':'')+'</div></div>';
+      });
+      cbB+='</div><div style="padding:6px 12px;font-size:10px;color:#94a3b8">Hover a row for every return trip · drywall, QA & permit visits excluded</div>';
+    }
+  }else{
+    cbB=divd("Callbacks")+'<div class="metric-row"><div class="dot" style="visibility:hidden"></div><div class="m-label" style="color:#94a3b8">Callback watchlist is live-only — go Back to Today to see it</div></div>';
+  }
+  var instSummary=viewDate?null:(cbAlerts>0?'<span style="color:#ef4444">🚨 '+cbAlerts+' OH SHIT</span>':cbList.length+" w/ callbacks");
+
   var bHtml=bFields.map(function(b){
     var val=b.type==="text"?gbs(act,b.k):gb(act,b.k);
     var cls=b.type==="text"?"sm":"";
@@ -359,6 +385,7 @@ function render(){
     '</div><div>'+
     sec("HVAC Service & Maintenance","❄️",c,co.lg,g("hvacServiceRevenue")>0?"$"+g("hvacServiceRevenue").toLocaleString():null,hB)+
     sec("HVAC Sales","📊",c,co.lg,totalHS>0?"$"+totalHS.toLocaleString():null,sB)+
+    sec("Installs","🏗️",cbAlerts>0&&!viewDate?"#ef4444":c,co.lg,instSummary,sparkHdr+instB+cbB)+
     '</div></div><div class="footer">Live from the ServiceTitan API · Budgeted days auto calculated from weekdays · Weekends excluded from sparklines · Date picker shows historical data</div></div>';
 }
 // ── Access gate (hosted mode only) ─────────────────────────────────────────
