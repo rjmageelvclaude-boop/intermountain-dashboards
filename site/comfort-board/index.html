@@ -9,7 +9,7 @@
   --page:#f4f6f9; --surface:#ffffff; --surface2:#f1f3f7; --ink:#17212f; --muted:#687382; --faint:#98a2b3;
   --hair:#e4e8ef; --hair2:#d5dbe5;
   --good:#157a4c; --good-bg:#e3f3ea; --bad:#bb3540; --bad-bg:#fae8ea; --warn:#9a6700; --warn-bg:#fdf3d7;
-  --bar-track:#e9edf3;
+  --bar-track:#e9edf3; --zebra:#f8fafc; --wkend:#fdf7ea;
   --c-turn:#1d4ed8; --c-mark:#b45309; --c-cost:#0e7490; --c-self:#6d28d9;
 }
 :root[data-theme="dark"]{
@@ -17,7 +17,7 @@
   --hair:rgba(255,255,255,.08); --hair2:rgba(255,255,255,.16);
   --good:#4bd695; --good-bg:rgba(75,214,149,.13); --bad:#ff858e; --bad-bg:rgba(255,133,142,.12);
   --warn:#f0b268; --warn-bg:rgba(240,178,104,.12);
-  --bar-track:rgba(255,255,255,.10);
+  --bar-track:rgba(255,255,255,.10); --zebra:rgba(255,255,255,.025); --wkend:rgba(240,178,104,.07);
   --c-turn:#8ab4ff; --c-mark:#f0b268; --c-cost:#67d3e8; --c-self:#c4a5ff;
 }
 :root[data-co="sierra"]{--accent:#24408e;--accent-ink:#fff;--tint:rgba(36,64,142,.06);--tint2:rgba(36,64,142,.12)}
@@ -29,14 +29,14 @@
 
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:"Segoe UI",system-ui,-apple-system,sans-serif;background:var(--page);color:var(--ink);min-height:100vh}
-.wrap{max-width:1380px;margin:0 auto;padding:24px 20px 40px}
+.wrap{width:100%;margin:0 auto;padding:18px 22px 34px}
 .board{background:var(--surface);border:1px solid var(--hair);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(13,25,45,.05)}
-.topbar{display:flex;align-items:center;gap:14px;padding:14px 20px 12px;border-bottom:1px solid var(--hair);flex-wrap:wrap}
-.wordmark{font-size:19px;font-weight:800;letter-spacing:.02em;white-space:nowrap}
+.topbar{display:flex;align-items:center;gap:14px;padding:14px 22px 12px;border-bottom:1px solid var(--hair);flex-wrap:wrap}
+.wordmark{font-size:20px;font-weight:800;letter-spacing:.02em;white-space:nowrap}
 .wordmark small{display:block;font-size:10px;font-weight:600;color:var(--faint);letter-spacing:.14em;text-transform:uppercase}
 .tabs{display:flex;gap:3px;background:var(--tint);padding:4px;border-radius:10px;flex-wrap:wrap}
 .tabs.co-tabs{margin-left:auto}
-.tab{font-size:12px;font-weight:600;color:var(--muted);padding:6px 12px;border-radius:7px;cursor:pointer;white-space:nowrap;user-select:none}
+.tab{font-size:12.5px;font-weight:600;color:var(--muted);padding:7px 14px;border-radius:7px;cursor:pointer;white-space:nowrap;user-select:none}
 .tab:hover{color:var(--ink)}
 .tab.on{background:var(--accent);color:var(--accent-ink);font-weight:700}
 .updated{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);white-space:nowrap}
@@ -46,51 +46,67 @@ body{font-family:"Segoe UI",system-ui,-apple-system,sans-serif;background:var(--
 .theme-btn{border:1px solid var(--hair2);background:transparent;color:var(--muted);font-size:13px;padding:5px 10px;border-radius:8px;cursor:pointer;font-family:inherit}
 .theme-btn:hover{color:var(--ink)}
 .theme-btn:focus-visible,.tab:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.subbar{display:flex;align-items:center;gap:10px;padding:10px 20px;border-bottom:1px solid var(--hair);flex-wrap:wrap}
-select.daypick{border:1px solid var(--hair2);background:var(--surface);color:var(--ink);font-family:inherit;font-size:12px;font-weight:600;padding:5px 8px;border-radius:8px}
-.body{padding:16px 20px 8px}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:10px;margin-bottom:16px}
-.card{background:var(--surface);border:1px solid var(--hair);border-radius:10px;padding:12px 14px;border-top:3px solid var(--accent)}
-.card .c-label{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin-bottom:5px}
-.card .c-val{font-size:23px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
-.card .c-sub{font-size:11px;margin-top:5px;font-weight:600;color:var(--faint)}
-.capbar{height:5px;border-radius:3px;background:var(--bar-track);margin-top:8px;position:relative;overflow:hidden}
+.subbar{display:flex;align-items:center;gap:10px;padding:10px 22px;border-bottom:1px solid var(--hair);flex-wrap:wrap}
+select.daypick{border:1px solid var(--hair2);background:var(--surface);color:var(--ink);font-family:inherit;font-size:12.5px;font-weight:600;padding:6px 9px;border-radius:8px}
+.body{padding:18px 22px 10px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:18px}
+.card{background:var(--surface);border:1px solid var(--hair);border-radius:12px;padding:14px 16px;border-top:3px solid var(--accent)}
+.card .c-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin-bottom:6px}
+.card .c-val{font-size:30px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.card .c-sub{font-size:11.5px;margin-top:7px;font-weight:600;color:var(--faint);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.capbar{height:6px;border-radius:3px;background:var(--bar-track);margin-top:9px;position:relative;overflow:hidden}
 .capbar i{position:absolute;top:0;bottom:0;left:0;border-radius:3px;background:var(--accent)}
-.chip{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:999px}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
 .chip.up{color:var(--good);background:var(--good-bg)}
 .chip.down{color:var(--bad);background:var(--bad-bg)}
 .chip.flat{color:var(--warn);background:var(--warn-bg)}
-.sect{font-size:10.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin:16px 2px 8px}
-.tbl-scroll{overflow-x:auto;border:1px solid var(--hair);border-radius:10px;margin-bottom:14px}
-table.g{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;min-width:720px}
-table.g th,table.g td{padding:7px 11px;text-align:right;font-weight:600;border-bottom:1px solid var(--hair);white-space:nowrap;font-variant-numeric:tabular-nums}
-table.g thead th{background:var(--surface2);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);position:sticky;top:0;z-index:2}
-table.g th:first-child,table.g td:first-child{text-align:left;padding-left:14px}
+.sect{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin:18px 2px 9px}
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.tbl-scroll{overflow-x:auto;border:1px solid var(--hair);border-radius:10px;margin-bottom:16px}
+table.g{width:100%;border-collapse:separate;border-spacing:0;font-size:14px}
+table.g th,table.g td{padding:9px 13px;text-align:right;font-weight:600;border-bottom:1px solid var(--hair);white-space:nowrap;font-variant-numeric:tabular-nums}
+table.g thead th{background:var(--surface2);font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);position:sticky;top:0;z-index:2}
+table.g th:first-child,table.g td:first-child{text-align:left;padding-left:15px}
+table.g tbody tr:nth-child(even):not(.tot) td{background:var(--zebra)}
+table.g tbody tr.wkend td{background:var(--wkend)}
 table.g tbody tr:hover td{background:var(--tint)}
 table.g tbody tr:last-child td{border-bottom:none}
 table.g tr.tot td{background:var(--surface2);font-weight:800;border-top:1px solid var(--hair2)}
 table.g .grp{border-left:1px solid var(--hair2)}
 table.g .dim{color:var(--faint)}
 .tt-turn{color:var(--c-turn)}.tt-mark{color:var(--c-mark)}.tt-cost{color:var(--c-cost)}.tt-self{color:var(--c-self)}
-.rankn{display:inline-block;min-width:20px;color:var(--faint);font-size:11px;font-weight:700}
+.rankn{display:inline-block;min-width:22px;color:var(--faint);font-size:11.5px;font-weight:700}
+.rbar{display:inline-block;vertical-align:middle;height:7px;border-radius:3px;background:var(--bar-track);width:90px;margin-left:10px;position:relative;overflow:hidden}
+.rbar i{position:absolute;top:0;bottom:0;left:0;border-radius:3px;background:var(--accent)}
+.trend{font-size:12px;font-weight:800}
+.trend.p{color:var(--good)}.trend.n{color:var(--bad)}.trend.z{color:var(--faint)}
 .edit{cursor:pointer}
 .edit:hover{outline:2px dashed var(--accent);outline-offset:-2px;border-radius:6px}
-.setup-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-bottom:14px}
+.setup-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:14px}
 .setup-box{background:var(--surface);border:1px solid var(--hair);border-radius:10px;overflow:hidden}
 .setup-box h3{font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);padding:10px 14px 6px}
-.setup-box .row{display:flex;justify-content:space-between;align-items:center;padding:7px 14px;border-top:1px solid var(--hair);font-size:13px;font-weight:600}
+.setup-box .row{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-top:1px solid var(--hair);font-size:13.5px;font-weight:600}
 .setup-box .row span:first-child{color:var(--muted)}
 .setup-box .row b{font-variant-numeric:tabular-nums}
-.footer{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 20px 12px;font-size:11px;font-weight:500;color:var(--faint);border-top:1px solid var(--hair)}
+.footer{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 22px 12px;font-size:11px;font-weight:500;color:var(--faint);border-top:1px solid var(--hair)}
 .feed-err{margin-top:10px;font-size:12px;font-weight:700;color:var(--bad)}
 .dash{color:var(--faint)}
+@media(min-width:1750px){
+  .card .c-val{font-size:36px}
+  table.g{font-size:15.5px}
+  .tab{font-size:14px;padding:8px 16px}
+  .wordmark{font-size:23px}
+}
+@media(max-width:980px){.duo{grid-template-columns:1fr}}
 @media(max-width:700px){
   .wrap{padding:12px 8px 28px}
   .topbar{padding:12px 12px 10px;gap:8px}
   .tabs.co-tabs{margin-left:0;width:100%;order:5}
   .body{padding:12px 10px 6px}
-  .card .c-val{font-size:19px}
-  table.g th,table.g td{padding:6px 8px}
+  .card .c-val{font-size:22px}
+  table.g{font-size:12.5px}
+  table.g th,table.g td{padding:7px 8px}
+  .rbar{width:44px;margin-left:6px}
   .footer{padding:10px 12px}
 }
 </style>
@@ -106,6 +122,7 @@ table.g .dim{color:var(--faint)}
 const BUDGET_URL="https://script.google.com/macros/s/AKfycby-J4xARcDQoDUwSfX6qsjYnM_QZyDfhd09WVBQXomJkLsrDysnkw-L0EZu0_S9Q4kz-w/exec";
 const DATA_URL="data.json";
 const REFRESH_MINUTES=5;
+const TREND_DAYS=3;          // trend arrows compare the last N full days to the N before
 
 const PIN_KEY="pcc-pin";
 const LS_KEY="cr-settings-v1";
@@ -116,7 +133,6 @@ const COS=["sierra","ultimate","russett"];
 const VIEWS=[["score","Scoreboard"],["adv","Advisors"],["turn","Turnovers"],["setup","Monthly Setup"]];
 const TYPES=[["turnover","Turnover","turn"],["marketed","Marketed","mark"],["costco","Costco","cost"],["selfgen","Self-Gen","self"]];
 
-// plan fields per company-month; store keys are "<company>|<YYYY-MM>|<field>"
 const PLAN_FIELDS=[
   ["workdays","Budgeted work days"],
   ["svcCalls","Budgeted service calls"],
@@ -191,11 +207,66 @@ function monthName(){
   return new Date(p[0],p[1]-1,1).toLocaleString("default",{month:"long",year:"numeric"});
 }
 function fmtDay(iso){var p=iso.split("-");return parseInt(p[1])+"/"+parseInt(p[2])}
+function dowOf(iso){return new Date(iso+"T12:00:00").toLocaleString("default",{weekday:"short"})}
+function isWkend(iso){var d=new Date(iso+"T12:00:00").getDay();return d===0||d===6}
 function B(){return data.companies[co]}
 function chip(v,fmt){
   var cls=v>0?"up":v<0?"down":"flat";
   var s=(v>0?"+":"")+(fmt?fmt(v):v);
   return'<span class="chip '+cls+'">'+s+'</span>';
+}
+
+// ── 3-day trend arrows ──
+// One entry per calendar day with any activity: {leads, sold, revenue, turns}
+function dailySeries(){
+  var b=B(),out={};
+  Object.keys(b.advisorDaily).forEach(function(d){
+    var t={leads:0,sold:0,revenue:0,turns:0};
+    var cells=b.advisorDaily[d];
+    Object.keys(cells).forEach(function(cid){
+      TYPES.forEach(function(ty){
+        var x=cells[cid][ty[0]];
+        if(x){t.leads+=x[0];t.sold+=x[1];t.revenue+=x[2]}
+      });
+    });
+    out[d]=t;
+  });
+  Object.keys(b.techDaily).forEach(function(d){
+    var t=out[d]=out[d]||{leads:0,sold:0,revenue:0,turns:0};
+    var cells=b.techDaily[d];
+    Object.keys(cells).forEach(function(tid){
+      t.turns+=(cells[tid].codTurn||0)+(cells[tid].maintTurn||0);
+    });
+  });
+  return out;
+}
+// last N active full days (before today) vs the N before them
+function trendOf(metric){
+  var b=B(),series=dailySeries();
+  var days=Object.keys(series).filter(function(d){return d<b.today&&(series[d].leads||series[d].turns)}).sort();
+  if(days.length<TREND_DAYS+1)return null;
+  var recent=days.slice(-TREND_DAYS),prior=days.slice(-TREND_DAYS*2,-TREND_DAYS);
+  if(!prior.length)return null;
+  function avg(list,f){var s=0;list.forEach(function(d){s+=f(series[d])});return s/list.length}
+  var f={
+    revenue:function(x){return x.revenue},
+    leads:function(x){return x.leads},
+    close:function(x){return x.leads?x.sold/x.leads:0},
+    turns:function(x){return x.turns},
+  }[metric];
+  var a=avg(recent,f),p=avg(prior,f);
+  if(p===0&&a===0)return{dir:0,pct:0};
+  if(p===0)return{dir:1,pct:null};
+  var ch=(a-p)/p*100;
+  return{dir:ch>2?1:ch<-2?-1:0,pct:Math.abs(Math.round(ch))};
+}
+function trendChip(metric,label){
+  var t=trendOf(metric);
+  if(!t)return"";
+  var arrow=t.dir>0?"&#9650;":t.dir<0?"&#9660;":"&#9654;";
+  var cls=t.dir>0?"up":t.dir<0?"down":"flat";
+  var txt=t.pct===null?"new":(t.dir===0?"steady":(t.pct+"%"));
+  return'<span class="chip '+cls+'" title="'+label+': last '+TREND_DAYS+' days vs the '+TREND_DAYS+' before">'+arrow+' '+txt+'</span>';
 }
 
 // planned monthly expectations, the Nexstar way: leads x close% x avg ticket
@@ -291,7 +362,7 @@ function subbar(withDays){
     pick='<select class="daypick" onchange="setDay(this.value)">'+
       '<option value="mtd"'+(day==="mtd"?" selected":"")+'>Month to date</option>'+
       days.map(function(d){
-        var lbl=d===b.today?"Today ("+fmtDay(d)+")":fmtDay(d);
+        var lbl=d===b.today?"Today ("+fmtDay(d)+")":dowOf(d)+" "+fmtDay(d);
         return'<option value="'+d+'"'+(day===d?" selected":"")+'>'+lbl+'</option>';
       }).join("")+'</select>';
   }
@@ -301,7 +372,7 @@ function subbar(withDays){
 }
 function shell(inner,foot,withDays){
   return'<div class="board">'+topbar()+subbar(withDays)+'<div class="body">'+inner+'</div>'+
-    '<div class="footer"><span>'+foot+'</span><span>Live from ServiceTitan &middot; lead types: Costco BU &middot; turnover = tech-generated lead &middot; self-gen = CA-generated &middot; marketed = the rest</span></div></div>'+
+    '<div class="footer"><span>'+foot+'</span><span>Sales revenue matches the CA Leaderboard to the dollar &middot; leads here count every completed run, so close rate can differ a touch from the CA board\'s opportunity rule</span></div></div>'+
     (feedError?'<div class="feed-err">'+feedError+'</div>':'');
 }
 function typeCols(){return TYPES.filter(function(t){return t[0]!=="costco"||B().hasCostco})}
@@ -315,39 +386,44 @@ function renderScore(){
 
   var turns=0,opps=0;
   b.techs.forEach(function(t){turns+=t.turns;opps+=t.opps});
-  var toRate=opps?turns/opps*100:0,toPlan=plan("toRate");
+  var toPlan=plan("toRate");
 
-  var revCard='<div class="card"><div class="c-label">MTD Revenue</div><div class="c-val">'+fmt$(rev)+'</div>'+
-    (p.revenue!==null?
-      '<div class="capbar"><i style="width:'+Math.min(rev/p.revenue*100,100).toFixed(0)+'%"></i></div>'+
-      '<div class="c-sub">'+pct(rev,p.revenue)+' of '+fmt$(p.revenue)+' plan'+(toDate?' &middot; '+chip(rev-toDate,fmt$)+' vs pace':'')+'</div>'
-      :'<div class="c-sub">set the plan in Monthly Setup</div>')+'</div>';
-  var paceCard='<div class="card"><div class="c-label">Full-Month Pace</div><div class="c-val">'+fmt$(pace)+'</div>'+
-    '<div class="c-sub">'+clock.elapsed+' of '+clock.total+' work days in'+(p.revenue!==null?' &middot; '+chip(pace-p.revenue,fmt$)+' vs plan':'')+'</div></div>';
-  var cards='<div class="cards">'+revCard+paceCard+
-    '<div class="card"><div class="c-label">Leads Ran</div><div class="c-val">'+m._total.leads+'</div><div class="c-sub">'+m._total.sold+' sold &middot; '+pct(m._total.sold,m._total.leads)+' close</div></div>'+
-    '<div class="card"><div class="c-label">Avg Sale</div><div class="c-val">'+(m._total.sold?fmt$(rev/m._total.sold):"&mdash;")+'</div><div class="c-sub">'+(m._total.leads?fmt$(rev/m._total.leads)+" per lead":"")+'</div></div>'+
-    '<div class="card"><div class="c-label">Turnover Rate</div><div class="c-val">'+(opps?Math.round(toRate)+"%":"&mdash;")+'</div><div class="c-sub">'+turns+' turns on '+opps+' opps'+(toPlan!==null?' &middot; plan '+toPlan+'%':'')+'</div></div>'+
-    '<div class="card"><div class="c-label">Turnover Cancels</div><div class="c-val">'+b.turnoverCancels+'</div><div class="c-sub">'+pct(b.turnoverCancels,turns+b.turnoverCancels)+' of turns booked</div></div>'+
+  var cards='<div class="cards">'+
+    '<div class="card"><div class="c-label">MTD Revenue</div><div class="c-val">'+fmt$(rev)+'</div>'+
+      (p.revenue!==null?
+        '<div class="capbar"><i style="width:'+Math.min(rev/p.revenue*100,100).toFixed(0)+'%"></i></div>'+
+        '<div class="c-sub">'+pct(rev,p.revenue)+' of '+fmt$(p.revenue)+' plan'+(toDate!==null?' '+chip(rev-toDate,fmt$):'')+'</div>'
+        :'<div class="c-sub">set the plan in Monthly Setup '+trendChip("revenue","Revenue per day")+'</div>')+'</div>'+
+    '<div class="card"><div class="c-label">Full-Month Pace</div><div class="c-val">'+fmt$(pace)+'</div>'+
+      '<div class="c-sub">'+clock.elapsed+' of '+clock.total+' work days in'+(p.revenue!==null?' '+chip(pace-p.revenue,fmt$):'')+' '+trendChip("revenue","Revenue per day")+'</div></div>'+
+    '<div class="card"><div class="c-label">Leads Ran</div><div class="c-val">'+m._total.leads+'</div>'+
+      '<div class="c-sub">'+m._total.sold+' sold MTD '+trendChip("leads","Leads per day")+'</div></div>'+
+    '<div class="card"><div class="c-label">Close Rate</div><div class="c-val">'+(m._total.leads?Math.round(m._total.sold/m._total.leads*100)+"%":"&mdash;")+'</div>'+
+      '<div class="c-sub">'+m._total.sold+' of '+m._total.leads+' leads '+trendChip("close","Close rate")+'</div></div>'+
+    '<div class="card"><div class="c-label">Avg Sale</div><div class="c-val">'+(m._total.sold?fmt$(rev/m._total.sold):"&mdash;")+'</div>'+
+      '<div class="c-sub">'+(m._total.leads?fmt$(rev/m._total.leads)+" per lead ran":"")+'</div></div>'+
+    '<div class="card"><div class="c-label">Turnover Rate</div><div class="c-val">'+(opps?Math.round(turns/opps*100)+"%":"&mdash;")+'</div>'+
+      '<div class="c-sub">'+turns+' turns on '+opps+' opps'+(toPlan!==null?' &middot; plan '+toPlan+'%':'')+' '+trendChip("turns","Turns per day")+'</div></div>'+
+    '<div class="card"><div class="c-label">Turnover Cancels</div><div class="c-val">'+b.turnoverCancels+'</div>'+
+      '<div class="c-sub">'+pct(b.turnoverCancels,turns+b.turnoverCancels)+' of turns booked</div></div>'+
   '</div>';
 
   var rows="";
   typeCols().forEach(function(t){
     var k=t[0],a=m[k],e=p.types[k];
-    var rev$=a.revenue,exp=e.revenue;
     rows+='<tr><td class="tt-'+t[2]+'" style="font-weight:800">'+t[1]+'</td>'+
       '<td>'+n0(a.leads)+'</td><td>'+n0(a.sold)+'</td><td>'+pct(a.sold,a.leads)+'</td>'+
-      '<td>'+(a.sold?fmt$(rev$/a.sold):'<span class="dash">&mdash;</span>')+'</td><td>'+fmt$0(rev$)+'</td>'+
+      '<td>'+(a.sold?fmt$(a.revenue/a.sold):'<span class="dash">&mdash;</span>')+'</td><td>'+fmt$0(a.revenue)+'</td>'+
       '<td class="grp dim">'+(e.leads!==null?Math.round(e.leads):"&mdash;")+'</td>'+
       '<td class="dim">'+(e.close!==null?e.close+"%":"&mdash;")+'</td>'+
       '<td class="dim">'+(e.avg!==null?fmt$(e.avg):"&mdash;")+'</td>'+
       '<td class="dim">'+(e.revenue!==null?fmt$(e.revenue):"&mdash;")+'</td>'+
-      '<td>'+(exp!==null?chip(rev$-exp,fmt$):'<span class="dash">&mdash;</span>')+'</td></tr>';
+      '<td>'+(e.revenue!==null?chip(a.revenue-e.revenue,fmt$):'<span class="dash">&mdash;</span>')+'</td></tr>';
   });
   var t=m._total;
   rows+='<tr class="tot"><td>TOTAL</td><td>'+t.leads+'</td><td>'+t.sold+'</td><td>'+pct(t.sold,t.leads)+'</td>'+
     '<td>'+(t.sold?fmt$(t.revenue/t.sold):"&mdash;")+'</td><td>'+fmt$(t.revenue)+'</td>'+
-    '<td class="grp dim">'+(p.types.turnover.leads!==null?"":"")+'</td><td class="dim"></td><td class="dim"></td>'+
+    '<td class="grp dim"></td><td class="dim"></td><td class="dim"></td>'+
     '<td class="dim">'+(p.revenue!==null?fmt$(p.revenue):"&mdash;")+'</td>'+
     '<td>'+(p.revenue!==null?chip(t.revenue-p.revenue,fmt$):'<span class="dash">&mdash;</span>')+'</td></tr>';
 
@@ -356,21 +432,50 @@ function renderScore(){
     '<th class="grp">Plan Leads</th><th>Plan Close</th><th>Plan Avg</th><th>Plan Revenue</th><th>Rev Var</th>'+
     '</tr></thead><tbody>'+rows+'</tbody></table></div>';
 
-  // last-7-days strip
-  var days=Object.keys(B().advisorDaily).sort().slice(-7).reverse();
-  var drows=days.map(function(d){
-    var tot={leads:0,sold:0,revenue:0};
-    advisorsForDay(d).forEach(function(a){tot.leads+=a.total.leads;tot.sold+=a.total.sold;tot.revenue+=a.total.revenue});
-    var td=b.techDaily[d]||{},turnsD=0;
-    Object.keys(td).forEach(function(k){turnsD+=(td[k].codTurn||0)+(td[k].maintTurn||0)});
-    return'<tr><td>'+(d===b.today?"<b>Today</b> "+fmtDay(d):fmtDay(d))+'</td><td>'+n0(tot.leads)+'</td><td>'+n0(tot.sold)+'</td>'+
-      '<td>'+pct(tot.sold,tot.leads)+'</td><td>'+fmt$0(tot.revenue)+'</td><td>'+n0(turnsD)+'</td></tr>';
+  // recent days with day-over-day arrows and revenue bars
+  var series=dailySeries();
+  var days=Object.keys(series).sort().slice(-8).reverse();
+  var maxRev=1;days.forEach(function(d){if(series[d].revenue>maxRev)maxRev=series[d].revenue});
+  var drows=days.map(function(d,i){
+    var x=series[d],prev=days[i+1]?series[days[i+1]]:null;
+    function dd(cur,pv){
+      if(pv===null||pv===undefined)return"";
+      var df=cur-pv;
+      return df>0?' <span class="trend p">&#9650;</span>':df<0?' <span class="trend n">&#9660;</span>':' <span class="trend z">&#9654;</span>';
+    }
+    var bar='<span class="rbar"><i style="width:'+(x.revenue/maxRev*100).toFixed(0)+'%"></i></span>';
+    return'<tr'+(isWkend(d)?' class="wkend"':'')+'><td>'+(d===b.today?"<b>Today</b> ":dowOf(d)+" ")+fmtDay(d)+'</td>'+
+      '<td>'+n0(x.leads)+(prev?dd(x.leads,prev.leads):"")+'</td>'+
+      '<td>'+n0(x.sold)+(prev?dd(x.sold,prev.sold):"")+'</td>'+
+      '<td>'+pct(x.sold,x.leads)+'</td>'+
+      '<td>'+fmt$0(x.revenue)+bar+'</td>'+
+      '<td>'+n0(x.turns)+(prev?dd(x.turns,prev.turns):"")+'</td></tr>';
   }).join("");
-  var daily='<div class="sect">Recent Days</div><div class="tbl-scroll"><table class="g" style="min-width:520px"><thead><tr>'+
+  var daily='<div class="sect">Recent Days <span style="letter-spacing:0;text-transform:none;font-weight:600">&middot; arrows vs the prior day</span></div>'+
+    '<div class="tbl-scroll"><table class="g"><thead><tr>'+
     '<th>Day</th><th>Leads Ran</th><th>Sold</th><th>Close</th><th>Revenue Sold</th><th>Turns Created</th></tr></thead><tbody>'+drows+'</tbody></table></div>';
 
-  document.getElementById("app").innerHTML=shell(cards+tbl+daily,
-    "Plan comes from Monthly Setup &middot; pace clock = Mon&ndash;Sat work days"+(plan("workdays")!==null?" capped at "+plan("workdays")+" budgeted":""),false);
+  // top-5 snapshots
+  var topAdv=b.advisors.slice(0,5),maxA=topAdv.length?Math.max(topAdv[0].total.revenue,1):1;
+  var advTbl='<div><div class="sect">Top Advisors &middot; MTD Revenue</div><div class="tbl-scroll"><table class="g"><thead><tr>'+
+    '<th>Advisor</th><th>Revenue</th><th>Sold / Leads</th><th>Close</th></tr></thead><tbody>'+
+    topAdv.map(function(a,i){
+      return'<tr><td><span class="rankn">'+(i+1)+'</span> '+a.name+'</td>'+
+        '<td>'+fmt$(a.total.revenue)+'<span class="rbar"><i style="width:'+(a.total.revenue/maxA*100).toFixed(0)+'%"></i></span></td>'+
+        '<td>'+a.total.sold+' / '+a.total.leads+'</td><td>'+pct(a.total.sold,a.total.leads)+'</td></tr>';
+    }).join("")+'</tbody></table></div></div>';
+  var topTech=b.techs.slice(0,5),maxT=topTech.length?Math.max(topTech[0].codRev+topTech[0].maintRev,1):1;
+  var techTbl='<div><div class="sect">Top Turnover Techs &middot; MTD</div><div class="tbl-scroll"><table class="g"><thead><tr>'+
+    '<th>Technician</th><th>Turn Revenue</th><th>Turns / Opps</th><th>TO Rate</th></tr></thead><tbody>'+
+    topTech.map(function(r,i){
+      var rv=r.codRev+r.maintRev;
+      return'<tr><td><span class="rankn">'+(i+1)+'</span> '+r.name+'</td>'+
+        '<td>'+fmt$(rv)+'<span class="rbar"><i style="width:'+(rv/maxT*100).toFixed(0)+'%"></i></span></td>'+
+        '<td>'+r.turns+' / '+r.opps+'</td><td>'+pct(r.turns,r.opps)+'</td></tr>';
+    }).join("")+'</tbody></table></div></div>';
+
+  document.getElementById("app").innerHTML=shell(cards+tbl+daily+'<div class="duo">'+advTbl+techTbl+'</div>',
+    "Trend arrows compare the last "+TREND_DAYS+" full days to the "+TREND_DAYS+" before &middot; plan comes from Monthly Setup &middot; pace clock = Mon&ndash;Sat work days"+(plan("workdays")!==null?" capped at "+plan("workdays")+" budgeted":""),false);
 }
 
 // ── advisors ──
