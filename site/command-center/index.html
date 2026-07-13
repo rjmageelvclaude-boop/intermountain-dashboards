@@ -66,6 +66,8 @@ body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:#f6f8fb;min-
 .date-pick{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:4px 10px;color:#fff;font-size:12px;font-weight:600;font-family:inherit;outline:none;cursor:pointer}
 .date-pick::-webkit-calendar-picker-indicator{filter:invert(1);cursor:pointer}
 .viewing-banner{background:#fef3c7;border-bottom:2px solid #f59e0b;padding:10px 24px;text-align:center;font-size:13px;font-weight:600;color:#92400e}
+.code-pink-overlay{position:fixed;inset:0;pointer-events:none;z-index:9999;background:#ec4899;animation:codePinkBlink 1.1s ease-in-out infinite}
+@keyframes codePinkBlink{0%,100%{opacity:0}50%{opacity:.32}}
 </style>
 </head>
 <body>
@@ -330,31 +332,33 @@ function render(){
   var whL=act==="sierra"?"Sold":"Installed";
   if(co.plumb){pB=mrow("Maintenance on Board",g("plumbMaintenanceOnBoard"),"#",undefined,"plumbMaintenanceOnBoard")+mrow("Maintenance Ran",g("plumbMaintenanceRan"),"#",undefined,"plumbMaintenanceRan")+mrow("Demand on Board",g("plumbDemandOnBoard"),"#",undefined,"plumbDemandOnBoard")+mrow("Demand Ran",g("plumbDemandRan"),"#",undefined,"plumbDemandRan")+mrow("Total Revenue",g("plumbRevenue"),"$",undefined,"plumbRevenue")+mrow("Total Sales",g("plumbSales"),"$",undefined,"plumbSales")+mrow("Average Ticket",plumbAvg,"$",undefined,null)+mrow("Memberships Sold",g("plumbMembershipsSold"),"#",undefined,"plumbMembershipsSold")+mrow("Tankless "+whL,g("plumbTanklessSold"),"#",undefined,"plumbTanklessSold")+mrow("Filtration "+whL,g("plumbFiltrationSold"),"#",undefined,"plumbFiltrationSold")+mrow("Tanks "+whL,g("plumbTanksSold"),"#",undefined,"plumbTanksSold")}
 
-  // Installs: board counts per day + the callback watchlist (live-only)
-  var instB=mrow("Installs on Board",g("installsOnBoard"),"#",undefined,"installsOnBoard");
-  if(g("plumbInstallsOnBoard")>0||act==="sierra"){instB+=mrow("&nbsp;&nbsp;HVAC",g("hvacInstallsOnBoard"),"#",undefined,"hvacInstallsOnBoard")+mrow("&nbsp;&nbsp;Plumbing",g("plumbInstallsOnBoard"),"#",undefined,"plumbInstallsOnBoard")}
-  instB+=mrow("Installs Completed",g("installsCompleted"),"#",undefined,"installsCompleted")+mrow("Same-Day Installs (sold today)",g("installsSameDay"),"#",undefined,"installsSameDay");
-  var cbData=sd[act]||{},cbList=cbData.installCallbacks||[],cbAlerts=cbData.installCallbackAlerts||0;
+  // Installs: real system installs by trade + today's-board callback list
+  var instB=divd("HVAC")+mrow("Installs on Board",g("hvacInstallsOnBoard"),"#",undefined,"hvacInstallsOnBoard")+mrow("Installs Completed",g("hvacInstallsCompleted"),"#",undefined,"hvacInstallsCompleted")+mrow("Same-Day Installs (sold today)",g("hvacInstallsSameDay"),"#",undefined,"hvacInstallsSameDay");
+  if(co.plumb){instB+=divd("Plumbing")+mrow("Installs on Board",g("plumbInstallsOnBoard"),"#",undefined,"plumbInstallsOnBoard")+mrow("Installs Completed",g("plumbInstallsCompleted"),"#",undefined,"plumbInstallsCompleted")+mrow("Same-Day Installs (sold today)",g("plumbInstallsSameDay"),"#",undefined,"plumbInstallsSameDay")}
+  var cbData=sd[act]||{},cbList=cbData.installCallbacksToday||[],cbAlerts=cbData.installCallbackAlerts||0;
   function fmtDay(s){if(!s)return"?";var p=s.split("-");return(+p[1])+"/"+(+p[2])}
   var cbB="";
   if(!viewDate){
-    cbB=divd("Callbacks — installs completed last "+(cbData.installCallbackWindowDays||30)+" days");
-    if(!cbList.length){cbB+='<div class="metric-row"><div class="dot" style="background:#16a34a"></div><div class="m-label" style="color:#16a34a;font-weight:600">No install callbacks 🎉</div></div>'}
+    cbB=divd("Callbacks on Today's Board");
+    if(!cbList.length){cbB+='<div class="metric-row"><div class="dot" style="background:#16a34a"></div><div class="m-label" style="color:#16a34a;font-weight:600">No install callbacks on the board today 🎉</div></div>'}
     else{
       cbB+='<div style="max-height:300px;overflow-y:auto">';
       cbList.forEach(function(r){
-        var tip=(r.trips||[]).map(function(t){return fmtDay(t.day)+" — "+t.type+" (#"+t.jobNumber+")"}).join("\n");
-        cbB+='<div class="metric-row" style="'+(r.ohShit?"background:rgba(239,68,68,.09)":"")+'" title="'+tip.replace(/"/g,"&quot;")+'">'
-          +'<div class="dot" style="background:'+(r.ohShit?"#ef4444":r.callbacks>1?"#eab308":"#cbd5e1")+'"></div>'
-          +'<div class="m-label" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">#'+r.jobNumber+' · '+r.installType+'<span style="color:#94a3b8"> · inst '+fmtDay(r.installedOn)+'</span></div>'
-          +'<div class="m-val" style="width:auto;font-size:12px;white-space:nowrap;color:'+(r.ohShit?"#ef4444":"#475569")+'">'+r.callbacks+' trip'+(r.callbacks>1?"s":"")+' back'+(r.ohShit?' 🚨':'')+'</div></div>';
+        var tip="Install #"+r.installJobNumber+" — "+r.installType+" — completed "+fmtDay(r.installedOn)
+          +"\nTrips back since install:\n"
+          +(r.tripLog||[]).map(function(t){return fmtDay(t.day)+" — "+t.type+" (#"+t.jobNumber+")"}).join("\n");
+        cbB+='<div class="metric-row" style="'+(r.codePink?"background:rgba(236,72,153,.12)":"")+'" title="'+tip.replace(/"/g,"&quot;")+'">'
+          +'<div class="dot" style="background:'+(r.codePink?"#ec4899":r.trips>1?"#eab308":"#cbd5e1")+'"></div>'
+          +'<div class="m-label" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">#'+r.jobNumber+' · '+r.type+'<span style="color:#94a3b8"> · install '+fmtDay(r.installedOn)+'</span></div>'
+          +'<div class="m-val" style="width:auto;font-size:12px;white-space:nowrap;color:'+(r.codePink?"#ec4899":"#475569")+'">trip '+r.trips+' back'+(r.codePink?' 🚨':'')+'</div></div>';
       });
-      cbB+='</div><div style="padding:6px 12px;font-size:10px;color:#94a3b8">Hover a row for every return trip · drywall, QA & permit visits excluded</div>';
+      cbB+='</div><div style="padding:6px 12px;font-size:10px;color:#94a3b8">Return trips to installs from the last '+(cbData.installCallbackWindowDays||30)+' days · hover a row for the full trip history · drywall, QA, permit & finish visits excluded</div>';
     }
   }else{
-    cbB=divd("Callbacks")+'<div class="metric-row"><div class="dot" style="visibility:hidden"></div><div class="m-label" style="color:#94a3b8">Callback watchlist is live-only — go Back to Today to see it</div></div>';
+    cbB=divd("Callbacks")+'<div class="metric-row"><div class="dot" style="visibility:hidden"></div><div class="m-label" style="color:#94a3b8">Callback list is live-only — go Back to Today to see it</div></div>';
   }
-  var instSummary=viewDate?null:(cbAlerts>0?'<span style="color:#ef4444">🚨 '+cbAlerts+' OH SHIT</span>':cbList.length+" w/ callbacks");
+  var codePink=cbAlerts>0&&!viewDate;
+  var instSummary=viewDate?null:(codePink?'<span style="color:#ec4899">🚨 CODE PINK ×'+cbAlerts+'</span>':cbList.length+" callback"+(cbList.length===1?"":"s")+" today");
 
   var bHtml=bFields.map(function(b){
     var val=b.type==="text"?gbs(act,b.k):gb(act,b.k);
@@ -385,8 +389,9 @@ function render(){
     '</div><div>'+
     sec("HVAC Service & Maintenance","❄️",c,co.lg,g("hvacServiceRevenue")>0?"$"+g("hvacServiceRevenue").toLocaleString():null,hB)+
     sec("HVAC Sales","📊",c,co.lg,totalHS>0?"$"+totalHS.toLocaleString():null,sB)+
-    sec("Installs","🏗️",cbAlerts>0&&!viewDate?"#ef4444":c,co.lg,instSummary,sparkHdr+instB+cbB)+
-    '</div></div><div class="footer">Live from the ServiceTitan API · Budgeted days auto calculated from weekdays · Weekends excluded from sparklines · Date picker shows historical data</div></div>';
+    sec("Installs","🏗️",codePink?"#ec4899":c,co.lg,instSummary,sparkHdr+instB+cbB)+
+    '</div></div><div class="footer">Live from the ServiceTitan API · Budgeted days auto calculated from weekdays · Weekends excluded from sparklines · Date picker shows historical data</div></div>'+
+    (codePink?'<div class="code-pink-overlay"></div>':'');
 }
 // ── Access gate (hosted mode only) ─────────────────────────────────────────
 // SHA-256 of the access code. To change the code: run in the browser console

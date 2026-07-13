@@ -21,10 +21,13 @@ Metric definitions (validated against the old report-based feed):
   - daily sales       = sum of estimates sold that day (sum of line items)
   - leads / booking   = inbound calls: leads are Booked+Unbooked, rate = Booked/leads
   - memberships sold  = membership line items on that day's invoices, split by BU
-  - installs          = jobs on the board in the install business units; same-day
-                        = install job also CREATED that day (sold + installed same day)
-  - install callbacks = non-drywall/non-QA jobs booked at an install's location
-                        after the install completed (last 30 days); >2 = alert
+  - installs          = real system installs on the board, split HVAC/plumbing
+                        (install-BU jobs with an "Install ..." type; part installs,
+                        recalls, QA, drywall, finish jobs excluded); same-day =
+                        install job also CREATED that day (sold + installed same day)
+  - install callbacks = return trips ON TODAY'S BOARD to a location with a system
+                        install completed in the last 30 days (drywall/QA/permit/
+                        finish/startup excluded); >2 total trips = CODE PINK
 
 CLI smoke test:
     py build/command_center_live.py sierra            # today's numbers
@@ -107,12 +110,21 @@ PLUMB_ALL = ("plumb_demand", "plumb_maint", "plumb_install")
 INSTALL_BUCKETS = ("hvac_install", "plumb_install")
 
 # Install callbacks: any return job at the install's location that is NOT an
-# expected follow-up (drywall patch, QA walk, permit inspection). Recall/Warranty
-# counts as a callback. Recall/permit/QA jobs also run in the install BUs, so
-# they are excluded from anchoring the list as "installs" themselves.
+# expected follow-up (drywall patch, QA walk, permit inspection, finish/startup
+# visits). Recall/Warranty counts as a callback.
 CALLBACK_LOOKBACK_DAYS = 30
-_CALLBACK_EXEMPT = re.compile(r"drywall|quality assurance|q\s*/\s*a|\bqa\b|permit|inspection", re.I)
-_NOT_AN_INSTALL = re.compile(r"recall|warranty", re.I)
+_CALLBACK_EXEMPT = re.compile(
+    r"drywall|quality assurance|q\s*/\s*a|\bqa\b|permit|inspection|finish|start\s*up|job walk", re.I)
+
+
+def _is_system_install(bucket, jt_name):
+    """A real install: an install-BU job whose type is an actual unit/system
+    install ("Install 80% Horizontal TGL", "Plumbing Install Tanked Water
+    Heater"). The install BUs also carry Recall/Warranty, QA, drywall, permit,
+    startup, finish-job and part-install traffic - none of that is an install
+    (RJ 2026-07-12: the board showed 4 HVAC installs when the raw BU count said 17)."""
+    return (bucket in INSTALL_BUCKETS and "install" in jt_name.lower()
+            and not re.search(r"\bpart\b", jt_name, re.I))
 
 
 # ---------------------------------------------------------------- timezones
@@ -319,11 +331,12 @@ def compute_day(company, day, jt_names=None):
     m["plumbMaintenanceRan"] = count(lambda j: j["_bucket"] == "plumb_maint" and ran(j))
     m["plumbDemandRan"] = count(lambda j: j["_bucket"] == "plumb_demand" and ran(j))
 
-    # -- installs on today's board (HVAC + plumbing install business units)
-    m["installsOnBoard"] = count(lambda j: j["_bucket"] in INSTALL_BUCKETS and live(j))
-    m["installsCompleted"] = count(lambda j: j["_bucket"] in INSTALL_BUCKETS and ran(j))
-    m["hvacInstallsOnBoard"] = count(lambda j: j["_bucket"] == "hvac_install" and live(j))
-    m["plumbInstallsOnBoard"] = count(lambda j: j["_bucket"] == "plumb_install" and live(j))
+    # -- real system installs on today's board, split by trade
+    inst = lambda j, t: j["_bucket"] == t and _is_system_install(t, j["_jt_name"])
+    m["hvacInstallsOnBoard"] = count(lambda j: live(j) and inst(j, "hvac_install"))
+    m["hvacInstallsCompleted"] = count(lambda j: ran(j) and inst(j, "hvac_install"))
+    m["plumbInstallsOnBoard"] = count(lambda j: live(j) and inst(j, "plumb_install"))
+    m["plumbInstallsCompleted"] = count(lambda j: ran(j) and inst(j, "plumb_install"))
 
     m["hvacSMCanceled"] = count(lambda j: j["_bucket"] in HVAC_SERVICE and j.get("jobStatus") == "Canceled")
     m["hvacSalesCanceled"] = count(lambda j: j["_bucket"] == "hvac_sales" and j.get("jobStatus") == "Canceled")
@@ -354,8 +367,10 @@ def compute_day(company, day, jt_names=None):
     # today. Install jobs are booked when the sale closes, so created-today +
     # installing-today = sold and installed the same day.
     created_ids = {j["id"] for j in created}
-    m["installsSameDay"] = count(
-        lambda j: j["_bucket"] in INSTALL_BUCKETS and live(j) and j["id"] in created_ids)
+    m["hvacInstallsSameDay"] = count(
+        lambda j: live(j) and inst(j, "hvac_install") and j["id"] in created_ids)
+    m["plumbInstallsSameDay"] = count(
+        lambda j: live(j) and inst(j, "plumb_install") and j["id"] in created_ids)
 
     # -- estimates sold today
     estimates = fetch_all(tenant, "/sales/v2/tenant/{tenant}/estimates",
@@ -508,71 +523,85 @@ def _local_date_str(ts, tz):
 
 
 def compute_install_callbacks(company):
-    """Callback watchlist for installs completed in the last CALLBACK_LOOKBACK_DAYS.
+    """Install callbacks ON TODAY'S BOARD (RJ 2026-07-12: only today's returns).
 
-    A callback = any job at the same location created AFTER the install was
-    completed, excluding expected follow-ups (drywall, QA), excluding canceled
-    jobs, and excluding new install/sales jobs (a second system purchase is not
-    a callback). More than 2 trips back = the oh-shit alert.
-
-    Current-state only (not part of per-day history): the list changes as new
-    return jobs get booked, so it is recomputed fresh on every refresh.
+    Anchor installs = real system installs (_is_system_install) completed in the
+    last CALLBACK_LOOKBACK_DAYS. A return trip = any job at the same location
+    created AFTER the install completed - excluding expected follow-ups
+    (_CALLBACK_EXEMPT: drywall/QA/permit/finish/startup), canceled jobs, sales
+    estimates, and new system installs (a second purchase is not a callback).
+    Listed rows are return trips with an appointment TODAY; `trips` = total
+    times back since the install (today included); >2 = CODE PINK (the board
+    blinks). Current-state only - not part of per-day history.
     """
     co = COMPANIES[company]
     tenant = co["tenant"]
     tz = co["tz"]
     today = local_today(tz)
-    start, _ = local_day_window_utc(tz, today - dt.timedelta(days=CALLBACK_LOOKBACK_DAYS))
-    _, end = local_day_window_utc(tz, today)
+    win_start, _ = local_day_window_utc(tz, today - dt.timedelta(days=CALLBACK_LOOKBACK_DAYS))
+    day_start, day_end = local_day_window_utc(tz, today)
     jt_names = job_type_names(tenant)
     bu = {int(k): v for k, v in co["bu"].items()}
+    jtname = lambda j: jt_names.get(j.get("jobTypeId"), "")
+    bucket = lambda j: bu.get(j.get("businessUnitId"))
 
-    installs = [j for j in fetch_all(
-        tenant, "/jpm/v2/tenant/{tenant}/jobs",
-        {"completedOnOrAfter": start, "completedBefore": end}, page_size=500, max_pages=100)
-        if bu.get(j.get("businessUnitId")) in INSTALL_BUCKETS
-        and j.get("jobStatus") == "Completed" and j.get("locationId")
-        and not _NOT_AN_INSTALL.search(jt_names.get(j.get("jobTypeId"), ""))
-        and not _CALLBACK_EXEMPT.search(jt_names.get(j.get("jobTypeId"), ""))]
-
-    # Every callback was created after its install completed, and installs only
-    # reach back CALLBACK_LOOKBACK_DAYS, so one created-in-window pull covers all.
-    by_location = {}
+    installs_by_loc = {}
     for j in fetch_all(tenant, "/jpm/v2/tenant/{tenant}/jobs",
-                       {"createdOnOrAfter": start, "createdBefore": end},
+                       {"completedOnOrAfter": win_start, "completedBefore": day_end},
                        page_size=500, max_pages=100):
-        by_location.setdefault(j.get("locationId"), []).append(j)
+        if (j.get("jobStatus") == "Completed" and j.get("locationId")
+                and _is_system_install(bucket(j), jtname(j))):
+            installs_by_loc.setdefault(j["locationId"], []).append(j)
 
-    rows = []
-    for inst in installs:
-        completed_on = inst.get("completedOn") or ""
-        trips = []
-        for j in by_location.get(inst["locationId"], []):
-            if j["id"] == inst["id"] or j.get("jobStatus") == "Canceled":
-                continue
-            if (j.get("createdOn") or "") <= completed_on:
-                continue
-            bucket = bu.get(j.get("businessUnitId"))
-            if bucket in INSTALL_BUCKETS or bucket == "hvac_sales":
-                continue
-            name = jt_names.get(j.get("jobTypeId"), "")
-            if _CALLBACK_EXEMPT.search(name):
-                continue
-            trips.append({"jobNumber": str(j.get("jobNumber") or j["id"]),
-                          "type": name,
-                          "day": _local_date_str(j.get("createdOn"), tz)})
-        if trips:
-            trips.sort(key=lambda t: t["day"] or "")
-            rows.append({"jobNumber": str(inst.get("jobNumber") or inst["id"]),
-                         "installType": jt_names.get(inst.get("jobTypeId"), ""),
-                         "installedOn": _local_date_str(inst.get("completedOn"), tz),
-                         "callbacks": len(trips),
-                         "trips": trips,
-                         "ohShit": len(trips) > 2})
-    rows.sort(key=lambda r: (-r["callbacks"], r["installedOn"] or ""))
-    return {"installCallbacks": rows,
-            "installCallbackJobs": len(rows),
-            "installCallbackAlerts": sum(1 for r in rows if r["ohShit"]),
+    def is_trip(j, install):
+        return (j["id"] != install["id"] and j.get("jobStatus") != "Canceled"
+                and (j.get("createdOn") or "") > (install.get("completedOn") or "")
+                and bucket(j) != "hvac_sales"
+                and not _is_system_install(bucket(j), jtname(j))
+                and not _CALLBACK_EXEMPT.search(jtname(j)))
+
+    # Every return trip was created after its install completed, and installs
+    # only reach back CALLBACK_LOOKBACK_DAYS, so one created-window pull covers
+    # the full trip history of every anchor install.
+    created_by_loc = {}
+    for j in fetch_all(tenant, "/jpm/v2/tenant/{tenant}/jobs",
+                       {"createdOnOrAfter": win_start, "createdBefore": day_end},
+                       page_size=500, max_pages=100):
+        created_by_loc.setdefault(j.get("locationId"), []).append(j)
+
+    board = fetch_all(tenant, "/jpm/v2/tenant/{tenant}/jobs",
+                      {"appointmentStartsOnOrAfter": day_start,
+                       "appointmentStartsBefore": day_end}, page_size=500)
+    rows, seen = [], set()
+    for j in board:
+        if j["id"] in seen or not j.get("locationId"):
+            continue
+        seen.add(j["id"])
+        candidates = [i for i in installs_by_loc.get(j["locationId"], [])
+                      if (j.get("createdOn") or "") > (i.get("completedOn") or "")]
+        if not candidates:
+            continue
+        install = max(candidates, key=lambda i: i.get("completedOn") or "")
+        if not is_trip(j, install):
+            continue
+        trips = sorted((t for t in created_by_loc.get(j["locationId"], [])
+                        if is_trip(t, install)),
+                       key=lambda t: t.get("createdOn") or "")
+        rows.append({"jobNumber": str(j.get("jobNumber") or j["id"]),
+                     "type": jtname(j),
+                     "status": j.get("jobStatus"),
+                     "installJobNumber": str(install.get("jobNumber") or install["id"]),
+                     "installType": jtname(install),
+                     "installedOn": _local_date_str(install.get("completedOn"), tz),
+                     "trips": len(trips),
+                     "tripLog": [{"jobNumber": str(t.get("jobNumber") or t["id"]),
+                                  "type": jtname(t),
+                                  "day": _local_date_str(t.get("createdOn"), tz)}
+                                 for t in trips],
+                     "codePink": len(trips) > 2})
+    rows.sort(key=lambda r: (-r["trips"], r["installedOn"] or ""))
+    return {"installCallbacksToday": rows,
+            "installCallbackAlerts": sum(1 for r in rows if r["codePink"]),
             "installCallbackWindowDays": CALLBACK_LOOKBACK_DAYS}
 
 
@@ -613,15 +642,15 @@ def read_history():
 def compute_history(progress=None):
     """Past-weekday metrics per company, cached on disk (past days never change).
 
-    Entries missing installsSameDay predate the install metrics (2026-07-12)
-    and are recomputed once so the sparklines don't mix definitions.
+    Entries missing hvacInstallsSameDay predate the real-system-install metrics
+    (2026-07-12) and are recomputed once so the sparklines don't mix definitions.
     """
     cache = _load_json(HISTORY_FILE, {})
     out = {}
     for company, co in COMPANIES.items():
         jt = None
         entries = {e["date"]: e for e in cache.get(company, [])
-                   if "installsSameDay" in e}
+                   if "hvacInstallsSameDay" in e}
         result = []
         for day in _history_days(co["tz"]):
             key = day.isoformat()
