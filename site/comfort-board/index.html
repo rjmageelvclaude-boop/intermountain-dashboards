@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Comfort Report</title>
+<style>
+:root{
+  --page:#f4f6f9; --surface:#ffffff; --surface2:#f1f3f7; --ink:#17212f; --muted:#687382; --faint:#98a2b3;
+  --hair:#e4e8ef; --hair2:#d5dbe5;
+  --good:#157a4c; --good-bg:#e3f3ea; --bad:#bb3540; --bad-bg:#fae8ea; --warn:#9a6700; --warn-bg:#fdf3d7;
+  --bar-track:#e9edf3;
+  --c-turn:#1d4ed8; --c-mark:#b45309; --c-cost:#0e7490; --c-self:#6d28d9;
+}
+:root[data-theme="dark"]{
+  --page:#0b1120; --surface:#131b2b; --surface2:#1a2438; --ink:#eaeff7; --muted:#93a0b4; --faint:#6d7a90;
+  --hair:rgba(255,255,255,.08); --hair2:rgba(255,255,255,.16);
+  --good:#4bd695; --good-bg:rgba(75,214,149,.13); --bad:#ff858e; --bad-bg:rgba(255,133,142,.12);
+  --warn:#f0b268; --warn-bg:rgba(240,178,104,.12);
+  --bar-track:rgba(255,255,255,.10);
+  --c-turn:#8ab4ff; --c-mark:#f0b268; --c-cost:#67d3e8; --c-self:#c4a5ff;
+}
+:root[data-co="sierra"]{--accent:#24408e;--accent-ink:#fff;--tint:rgba(36,64,142,.06);--tint2:rgba(36,64,142,.12)}
+:root[data-co="ultimate"]{--accent:#6d28d9;--accent-ink:#fff;--tint:rgba(109,40,217,.06);--tint2:rgba(109,40,217,.12)}
+:root[data-co="russett"]{--accent:#b91c1c;--accent-ink:#fff;--tint:rgba(185,28,28,.06);--tint2:rgba(185,28,28,.12)}
+:root[data-theme="dark"][data-co="sierra"]{--accent:#7db2ff;--accent-ink:#0b1120;--tint:rgba(125,178,255,.08);--tint2:rgba(125,178,255,.18)}
+:root[data-theme="dark"][data-co="ultimate"]{--accent:#c4a5ff;--accent-ink:#0b1120;--tint:rgba(196,165,255,.08);--tint2:rgba(196,165,255,.18)}
+:root[data-theme="dark"][data-co="russett"]{--accent:#ff8f96;--accent-ink:#0b1120;--tint:rgba(255,143,150,.08);--tint2:rgba(255,143,150,.18)}
+
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Segoe UI",system-ui,-apple-system,sans-serif;background:var(--page);color:var(--ink);min-height:100vh}
+.wrap{max-width:1380px;margin:0 auto;padding:24px 20px 40px}
+.board{background:var(--surface);border:1px solid var(--hair);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(13,25,45,.05)}
+.topbar{display:flex;align-items:center;gap:14px;padding:14px 20px 12px;border-bottom:1px solid var(--hair);flex-wrap:wrap}
+.wordmark{font-size:19px;font-weight:800;letter-spacing:.02em;white-space:nowrap}
+.wordmark small{display:block;font-size:10px;font-weight:600;color:var(--faint);letter-spacing:.14em;text-transform:uppercase}
+.tabs{display:flex;gap:3px;background:var(--tint);padding:4px;border-radius:10px;flex-wrap:wrap}
+.tabs.co-tabs{margin-left:auto}
+.tab{font-size:12px;font-weight:600;color:var(--muted);padding:6px 12px;border-radius:7px;cursor:pointer;white-space:nowrap;user-select:none}
+.tab:hover{color:var(--ink)}
+.tab.on{background:var(--accent);color:var(--accent-ink);font-weight:700}
+.updated{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);white-space:nowrap}
+.updated .pulse{width:7px;height:7px;border-radius:50%;background:var(--good);animation:pulse 2.2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+@media (prefers-reduced-motion: reduce){.updated .pulse{animation:none}}
+.theme-btn{border:1px solid var(--hair2);background:transparent;color:var(--muted);font-size:13px;padding:5px 10px;border-radius:8px;cursor:pointer;font-family:inherit}
+.theme-btn:hover{color:var(--ink)}
+.theme-btn:focus-visible,.tab:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.subbar{display:flex;align-items:center;gap:10px;padding:10px 20px;border-bottom:1px solid var(--hair);flex-wrap:wrap}
+select.daypick{border:1px solid var(--hair2);background:var(--surface);color:var(--ink);font-family:inherit;font-size:12px;font-weight:600;padding:5px 8px;border-radius:8px}
+.body{padding:16px 20px 8px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:10px;margin-bottom:16px}
+.card{background:var(--surface);border:1px solid var(--hair);border-radius:10px;padding:12px 14px;border-top:3px solid var(--accent)}
+.card .c-label{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin-bottom:5px}
+.card .c-val{font-size:23px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.card .c-sub{font-size:11px;margin-top:5px;font-weight:600;color:var(--faint)}
+.capbar{height:5px;border-radius:3px;background:var(--bar-track);margin-top:8px;position:relative;overflow:hidden}
+.capbar i{position:absolute;top:0;bottom:0;left:0;border-radius:3px;background:var(--accent)}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:999px}
+.chip.up{color:var(--good);background:var(--good-bg)}
+.chip.down{color:var(--bad);background:var(--bad-bg)}
+.chip.flat{color:var(--warn);background:var(--warn-bg)}
+.sect{font-size:10.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin:16px 2px 8px}
+.tbl-scroll{overflow-x:auto;border:1px solid var(--hair);border-radius:10px;margin-bottom:14px}
+table.g{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;min-width:720px}
+table.g th,table.g td{padding:7px 11px;text-align:right;font-weight:600;border-bottom:1px solid var(--hair);white-space:nowrap;font-variant-numeric:tabular-nums}
+table.g thead th{background:var(--surface2);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);position:sticky;top:0;z-index:2}
+table.g th:first-child,table.g td:first-child{text-align:left;padding-left:14px}
+table.g tbody tr:hover td{background:var(--tint)}
+table.g tbody tr:last-child td{border-bottom:none}
+table.g tr.tot td{background:var(--surface2);font-weight:800;border-top:1px solid var(--hair2)}
+table.g .grp{border-left:1px solid var(--hair2)}
+table.g .dim{color:var(--faint)}
+.tt-turn{color:var(--c-turn)}.tt-mark{color:var(--c-mark)}.tt-cost{color:var(--c-cost)}.tt-self{color:var(--c-self)}
+.rankn{display:inline-block;min-width:20px;color:var(--faint);font-size:11px;font-weight:700}
+.edit{cursor:pointer}
+.edit:hover{outline:2px dashed var(--accent);outline-offset:-2px;border-radius:6px}
+.setup-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-bottom:14px}
+.setup-box{background:var(--surface);border:1px solid var(--hair);border-radius:10px;overflow:hidden}
+.setup-box h3{font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);padding:10px 14px 6px}
+.setup-box .row{display:flex;justify-content:space-between;align-items:center;padding:7px 14px;border-top:1px solid var(--hair);font-size:13px;font-weight:600}
+.setup-box .row span:first-child{color:var(--muted)}
+.setup-box .row b{font-variant-numeric:tabular-nums}
+.footer{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 20px 12px;font-size:11px;font-weight:500;color:var(--faint);border-top:1px solid var(--hair)}
+.feed-err{margin-top:10px;font-size:12px;font-weight:700;color:var(--bad)}
+.dash{color:var(--faint)}
+@media(max-width:700px){
+  .wrap{padding:12px 8px 28px}
+  .topbar{padding:12px 12px 10px;gap:8px}
+  .tabs.co-tabs{margin-left:0;width:100%;order:5}
+  .body{padding:12px 10px 6px}
+  .card .c-val{font-size:19px}
+  table.g th,table.g td{padding:6px 8px}
+  .footer{padding:10px 12px}
+}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+<div style="display:flex;justify-content:center;align-items:center;height:80vh;color:var(--faint)"><div style="text-align:center"><div style="font-size:32px;margin-bottom:12px">&#128202;</div><div style="font-size:14px;font-weight:600">Loading Comfort Report...</div></div></div>
+</div>
+<script>
+// Monthly plan inputs (workdays, budgeted calls, close % and average tickets
+// per lead type) are shared for all viewers through the same PIN-protected
+// Apps Script store the Command Center uses, namespaced under co="comfort".
+const BUDGET_URL="https://script.google.com/macros/s/AKfycby-J4xARcDQoDUwSfX6qsjYnM_QZyDfhd09WVBQXomJkLsrDysnkw-L0EZu0_S9Q4kz-w/exec";
+const DATA_URL="data.json";
+const REFRESH_MINUTES=5;
+
+const PIN_KEY="pcc-pin";
+const LS_KEY="cr-settings-v1";
+const CO_KEY="cr-co-v1";
+const VIEW_KEY="cr-view-v1";
+const THEME_KEY="cr-theme";
+const COS=["sierra","ultimate","russett"];
+const VIEWS=[["score","Scoreboard"],["adv","Advisors"],["turn","Turnovers"],["setup","Monthly Setup"]];
+const TYPES=[["turnover","Turnover","turn"],["marketed","Marketed","mark"],["costco","Costco","cost"],["selfgen","Self-Gen","self"]];
+
+// plan fields per company-month; store keys are "<company>|<YYYY-MM>|<field>"
+const PLAN_FIELDS=[
+  ["workdays","Budgeted work days"],
+  ["svcCalls","Budgeted service calls"],
+  ["toRate","Planned turnover rate %"],
+  ["mktLeads","Marketed leads budgeted"],
+  ["costcoLeads","Costco leads budgeted"],
+  ["selfLeads","Self-gen leads budgeted"],
+  ["closeTurn","Turnover close %"],
+  ["closeMkt","Marketed close %"],
+  ["closeCostco","Costco close %"],
+  ["closeSelf","Self-gen close %"],
+  ["avgTurn","Turnover avg ticket $"],
+  ["avgMkt","Marketed avg ticket $"],
+  ["avgCostco","Costco avg ticket $"],
+  ["avgSelf","Self-gen avg ticket $"],
+];
+
+let data=null,settings=JSON.parse(localStorage.getItem(LS_KEY)||"{}"),synced=false,feedError=null;
+let co=localStorage.getItem(CO_KEY);if(COS.indexOf(co)<0)co="sierra";
+let view=localStorage.getItem(VIEW_KEY);if(!VIEWS.some(function(v){return v[0]===view}))view="score";
+let day="mtd"; // "mtd" or "YYYY-MM-DD"
+
+function applyTheme(t){document.documentElement.setAttribute("data-theme",t);localStorage.setItem(THEME_KEY,t)}
+applyTheme(localStorage.getItem(THEME_KEY)||(window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"));
+function toggleTheme(){applyTheme(document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark");render()}
+
+// ── shared settings (Apps Script) ──
+async function post(body){
+  var r=await fetch(BUDGET_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(body)});
+  return r.json();
+}
+async function loadSettings(){
+  try{
+    var j=await post({action:"getBudgets"});
+    if(j&&j.ok){settings=(j.budgets&&j.budgets.comfort)||{};synced=true;localStorage.setItem(LS_KEY,JSON.stringify(settings))}
+  }catch(e){console.warn("Shared inputs unavailable - using this device's saved values",e)}
+}
+async function saveSetting(key,value){
+  settings[key]=value;localStorage.setItem(LS_KEY,JSON.stringify(settings));render();
+  if(!synced)return;
+  var pin=localStorage.getItem(PIN_KEY)||prompt("Enter the PIN to save shared plan inputs:");
+  if(!pin)return;
+  try{
+    var j=await post({action:"setBudget",pin:pin,co:"comfort",key:key,value:value});
+    if(j&&j.ok){localStorage.setItem(PIN_KEY,pin);settings=(j.budgets&&j.budgets.comfort)||settings;localStorage.setItem(LS_KEY,JSON.stringify(settings))}
+    else if(j&&j.error==="bad-pin"){localStorage.removeItem(PIN_KEY);alert("Wrong PIN - change was NOT saved for other viewers.")}
+    else{alert("Could not save shared input: "+((j&&j.error)||"unknown error"))}
+  }catch(e){alert("Could not reach the settings server - change saved on this device only.")}
+  render();
+}
+function plan(field){
+  var v=settings[co+"|"+(data?data.month:"")+"|"+field];
+  return(v===undefined||v===""||isNaN(Number(v)))?null:Number(v);
+}
+function editPlan(field,label){
+  var cur=plan(field);
+  var v=prompt(label+" - "+co.charAt(0).toUpperCase()+co.slice(1)+", "+monthName()+":",cur===null?"":cur);
+  if(v===null)return;
+  v=v.trim();
+  if(v!==""&&isNaN(Number(v))){alert("Enter a number.");return}
+  saveSetting(co+"|"+data.month+"|"+field,v===""?"":Number(v));
+}
+
+// ── helpers ──
+function fmt$(v){return"$"+Math.round(v).toLocaleString()}
+function fmt$0(v){return v?fmt$(v):'<span class="dash">&mdash;</span>'}
+function pct(n,d){return d?Math.round(n/d*100)+"%":'<span class="dash">&mdash;</span>'}
+function n0(v){return v?v:'<span class="dash">&mdash;</span>'}
+function monthName(){
+  if(!data)return"";
+  var p=data.month.split("-");
+  return new Date(p[0],p[1]-1,1).toLocaleString("default",{month:"long",year:"numeric"});
+}
+function fmtDay(iso){var p=iso.split("-");return parseInt(p[1])+"/"+parseInt(p[2])}
+function B(){return data.companies[co]}
+function chip(v,fmt){
+  var cls=v>0?"up":v<0?"down":"flat";
+  var s=(v>0?"+":"")+(fmt?fmt(v):v);
+  return'<span class="chip '+cls+'">'+s+'</span>';
+}
+
+// planned monthly expectations, the Nexstar way: leads x close% x avg ticket
+function planCalc(){
+  var svc=plan("svcCalls"),to=plan("toRate");
+  var leads={turnover:svc!==null&&to!==null?svc*to/100:null,
+             marketed:plan("mktLeads"),costco:plan("costcoLeads"),selfgen:plan("selfLeads")};
+  var close={turnover:plan("closeTurn"),marketed:plan("closeMkt"),costco:plan("closeCostco"),selfgen:plan("closeSelf")};
+  var avg={turnover:plan("avgTurn"),marketed:plan("avgMkt"),costco:plan("avgCostco"),selfgen:plan("avgSelf")};
+  var out={types:{},revenue:null,sales:null};
+  TYPES.forEach(function(t){
+    var k=t[0],l=leads[k],c=close[k],a=avg[k];
+    var sales=(l!==null&&c!==null)?l*c/100:null;
+    var rev=(sales!==null&&a!==null)?sales*a:null;
+    out.types[k]={leads:l,close:c,avg:a,sales:sales,revenue:rev};
+    if(rev!==null){out.revenue=(out.revenue||0)+rev}
+    if(sales!==null){out.sales=(out.sales||0)+sales}
+  });
+  return out;
+}
+// Mon-Sat days elapsed (through today) and in the whole month - the pace clock
+function workdayClock(){
+  var b=B(),p=data.month.split("-"),y=+p[0],m=+p[1];
+  var today=+b.today.split("-")[2],total=b.monthDays,el=0,all=0;
+  for(var d=1;d<=total;d++){
+    var dow=new Date(y,m-1,d).getDay();
+    if(dow!==0){all++;if(d<=today)el++}
+  }
+  var budget=plan("workdays");
+  if(budget!==null&&budget>0){el=Math.min(el,budget);all=budget}
+  return{elapsed:el,total:all};
+}
+
+// MTD totals by type for the company (sums the advisor rows)
+function mtdTotals(){
+  var b=B(),out={},tot={leads:0,sold:0,revenue:0};
+  TYPES.forEach(function(t){out[t[0]]={leads:0,sold:0,revenue:0}});
+  b.advisors.forEach(function(a){
+    TYPES.forEach(function(t){
+      var x=a.types[t[0]];
+      out[t[0]].leads+=x.leads;out[t[0]].sold+=x.sold;out[t[0]].revenue+=x.revenue;
+    });
+    tot.leads+=a.total.leads;tot.sold+=a.total.sold;tot.revenue+=a.total.revenue;
+  });
+  out._total=tot;
+  return out;
+}
+// per-advisor numbers for one day (from advisorDaily) shaped like the MTD rows
+function advisorsForDay(iso){
+  var b=B(),d=b.advisorDaily[iso]||{};
+  return b.advisors.map(function(a){
+    var cell=d[String(a.id)]||{};
+    var types={},tot={leads:0,sold:0,revenue:0};
+    TYPES.forEach(function(t){
+      var x=cell[t[0]]||[0,0,0];
+      types[t[0]]={leads:x[0],sold:x[1],revenue:x[2]};
+      tot.leads+=x[0];tot.sold+=x[1];tot.revenue+=x[2];
+    });
+    return{id:a.id,name:a.name,types:types,total:tot};
+  }).filter(function(a){return a.total.leads||a.total.sold||a.total.revenue})
+    .sort(function(x,y){return y.total.revenue-x.total.revenue||y.total.leads-x.total.leads});
+}
+const T_FIELDS=["codOpp","maintOpp","codTurn","maintTurn","codRan","maintRan","codSold","codRev","maintSold","maintRev"];
+function techsForDay(iso){
+  var b=B(),d=b.techDaily[iso]||{};
+  var byId={};b.techs.forEach(function(t){byId[String(t.id)]=t.name});
+  return Object.keys(d).map(function(tid){
+    var row={id:tid,name:byId[tid]||tid};
+    T_FIELDS.forEach(function(f){row[f]=d[tid][f]||0});
+    row.opps=row.codOpp+row.maintOpp;row.turns=row.codTurn+row.maintTurn;
+    return row;
+  }).filter(function(r){return r.opps||r.turns||r.codRan+r.maintRan||r.codRev+r.maintRev})
+    .sort(function(x,y){return(y.codRev+y.maintRev)-(x.codRev+x.maintRev)||y.turns-x.turns});
+}
+
+// ── chrome ──
+function topbar(){
+  var gen=data&&data.generatedAt?new Date(data.generatedAt).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}):"?";
+  return'<div class="topbar">'+
+    '<div class="wordmark">Comfort Report<small>'+monthName()+' &middot; InterMountain Live Board</small></div>'+
+    '<div class="tabs co-tabs">'+COS.map(function(c){
+      return'<span class="tab'+(c===co?" on":"")+'" tabindex="0" onclick="setCo(\''+c+'\')">'+c.charAt(0).toUpperCase()+c.slice(1)+'</span>';
+    }).join("")+'</div>'+
+    '<span class="updated"><span class="pulse"></span>Updated '+gen+'</span>'+
+    '<button class="theme-btn" onclick="toggleTheme()" title="Toggle dark mode">'+(document.documentElement.getAttribute("data-theme")==="dark"?"&#9788;":"&#9789;")+'</button>'+
+  '</div>';
+}
+function subbar(withDays){
+  var b=B();
+  var days=Object.keys(Object.assign({},b.advisorDaily,b.techDaily)).sort().reverse();
+  var pick="";
+  if(withDays){
+    pick='<select class="daypick" onchange="setDay(this.value)">'+
+      '<option value="mtd"'+(day==="mtd"?" selected":"")+'>Month to date</option>'+
+      days.map(function(d){
+        var lbl=d===b.today?"Today ("+fmtDay(d)+")":fmtDay(d);
+        return'<option value="'+d+'"'+(day===d?" selected":"")+'>'+lbl+'</option>';
+      }).join("")+'</select>';
+  }
+  return'<div class="subbar"><div class="tabs">'+VIEWS.map(function(v){
+    return'<span class="tab'+(v[0]===view?" on":"")+'" tabindex="0" onclick="setView(\''+v[0]+'\')">'+v[1]+'</span>';
+  }).join("")+'</div>'+pick+'</div>';
+}
+function shell(inner,foot,withDays){
+  return'<div class="board">'+topbar()+subbar(withDays)+'<div class="body">'+inner+'</div>'+
+    '<div class="footer"><span>'+foot+'</span><span>Live from ServiceTitan &middot; lead types: Costco BU &middot; turnover = tech-generated lead &middot; self-gen = CA-generated &middot; marketed = the rest</span></div></div>'+
+    (feedError?'<div class="feed-err">'+feedError+'</div>':'');
+}
+function typeCols(){return TYPES.filter(function(t){return t[0]!=="costco"||B().hasCostco})}
+
+// ── scoreboard ──
+function renderScore(){
+  var b=B(),m=mtdTotals(),p=planCalc(),clock=workdayClock();
+  var rev=m._total.revenue;
+  var pace=clock.elapsed?rev/clock.elapsed*clock.total:0;
+  var toDate=p.revenue!==null&&clock.total?p.revenue*clock.elapsed/clock.total:null;
+
+  var turns=0,opps=0;
+  b.techs.forEach(function(t){turns+=t.turns;opps+=t.opps});
+  var toRate=opps?turns/opps*100:0,toPlan=plan("toRate");
+
+  var revCard='<div class="card"><div class="c-label">MTD Revenue</div><div class="c-val">'+fmt$(rev)+'</div>'+
+    (p.revenue!==null?
+      '<div class="capbar"><i style="width:'+Math.min(rev/p.revenue*100,100).toFixed(0)+'%"></i></div>'+
+      '<div class="c-sub">'+pct(rev,p.revenue)+' of '+fmt$(p.revenue)+' plan'+(toDate?' &middot; '+chip(rev-toDate,fmt$)+' vs pace':'')+'</div>'
+      :'<div class="c-sub">set the plan in Monthly Setup</div>')+'</div>';
+  var paceCard='<div class="card"><div class="c-label">Full-Month Pace</div><div class="c-val">'+fmt$(pace)+'</div>'+
+    '<div class="c-sub">'+clock.elapsed+' of '+clock.total+' work days in'+(p.revenue!==null?' &middot; '+chip(pace-p.revenue,fmt$)+' vs plan':'')+'</div></div>';
+  var cards='<div class="cards">'+revCard+paceCard+
+    '<div class="card"><div class="c-label">Leads Ran</div><div class="c-val">'+m._total.leads+'</div><div class="c-sub">'+m._total.sold+' sold &middot; '+pct(m._total.sold,m._total.leads)+' close</div></div>'+
+    '<div class="card"><div class="c-label">Avg Sale</div><div class="c-val">'+(m._total.sold?fmt$(rev/m._total.sold):"&mdash;")+'</div><div class="c-sub">'+(m._total.leads?fmt$(rev/m._total.leads)+" per lead":"")+'</div></div>'+
+    '<div class="card"><div class="c-label">Turnover Rate</div><div class="c-val">'+(opps?Math.round(toRate)+"%":"&mdash;")+'</div><div class="c-sub">'+turns+' turns on '+opps+' opps'+(toPlan!==null?' &middot; plan '+toPlan+'%':'')+'</div></div>'+
+    '<div class="card"><div class="c-label">Turnover Cancels</div><div class="c-val">'+b.turnoverCancels+'</div><div class="c-sub">'+pct(b.turnoverCancels,turns+b.turnoverCancels)+' of turns booked</div></div>'+
+  '</div>';
+
+  var rows="";
+  typeCols().forEach(function(t){
+    var k=t[0],a=m[k],e=p.types[k];
+    var rev$=a.revenue,exp=e.revenue;
+    rows+='<tr><td class="tt-'+t[2]+'" style="font-weight:800">'+t[1]+'</td>'+
+      '<td>'+n0(a.leads)+'</td><td>'+n0(a.sold)+'</td><td>'+pct(a.sold,a.leads)+'</td>'+
+      '<td>'+(a.sold?fmt$(rev$/a.sold):'<span class="dash">&mdash;</span>')+'</td><td>'+fmt$0(rev$)+'</td>'+
+      '<td class="grp dim">'+(e.leads!==null?Math.round(e.leads):"&mdash;")+'</td>'+
+      '<td class="dim">'+(e.close!==null?e.close+"%":"&mdash;")+'</td>'+
+      '<td class="dim">'+(e.avg!==null?fmt$(e.avg):"&mdash;")+'</td>'+
+      '<td class="dim">'+(e.revenue!==null?fmt$(e.revenue):"&mdash;")+'</td>'+
+      '<td>'+(exp!==null?chip(rev$-exp,fmt$):'<span class="dash">&mdash;</span>')+'</td></tr>';
+  });
+  var t=m._total;
+  rows+='<tr class="tot"><td>TOTAL</td><td>'+t.leads+'</td><td>'+t.sold+'</td><td>'+pct(t.sold,t.leads)+'</td>'+
+    '<td>'+(t.sold?fmt$(t.revenue/t.sold):"&mdash;")+'</td><td>'+fmt$(t.revenue)+'</td>'+
+    '<td class="grp dim">'+(p.types.turnover.leads!==null?"":"")+'</td><td class="dim"></td><td class="dim"></td>'+
+    '<td class="dim">'+(p.revenue!==null?fmt$(p.revenue):"&mdash;")+'</td>'+
+    '<td>'+(p.revenue!==null?chip(t.revenue-p.revenue,fmt$):'<span class="dash">&mdash;</span>')+'</td></tr>';
+
+  var tbl='<div class="sect">Monthly Actuals vs Plan</div><div class="tbl-scroll"><table class="g"><thead><tr>'+
+    '<th>Lead Type</th><th>Leads</th><th>Sold</th><th>Close</th><th>Avg Sale</th><th>Revenue</th>'+
+    '<th class="grp">Plan Leads</th><th>Plan Close</th><th>Plan Avg</th><th>Plan Revenue</th><th>Rev Var</th>'+
+    '</tr></thead><tbody>'+rows+'</tbody></table></div>';
+
+  // last-7-days strip
+  var days=Object.keys(B().advisorDaily).sort().slice(-7).reverse();
+  var drows=days.map(function(d){
+    var tot={leads:0,sold:0,revenue:0};
+    advisorsForDay(d).forEach(function(a){tot.leads+=a.total.leads;tot.sold+=a.total.sold;tot.revenue+=a.total.revenue});
+    var td=b.techDaily[d]||{},turnsD=0;
+    Object.keys(td).forEach(function(k){turnsD+=(td[k].codTurn||0)+(td[k].maintTurn||0)});
+    return'<tr><td>'+(d===b.today?"<b>Today</b> "+fmtDay(d):fmtDay(d))+'</td><td>'+n0(tot.leads)+'</td><td>'+n0(tot.sold)+'</td>'+
+      '<td>'+pct(tot.sold,tot.leads)+'</td><td>'+fmt$0(tot.revenue)+'</td><td>'+n0(turnsD)+'</td></tr>';
+  }).join("");
+  var daily='<div class="sect">Recent Days</div><div class="tbl-scroll"><table class="g" style="min-width:520px"><thead><tr>'+
+    '<th>Day</th><th>Leads Ran</th><th>Sold</th><th>Close</th><th>Revenue Sold</th><th>Turns Created</th></tr></thead><tbody>'+drows+'</tbody></table></div>';
+
+  document.getElementById("app").innerHTML=shell(cards+tbl+daily,
+    "Plan comes from Monthly Setup &middot; pace clock = Mon&ndash;Sat work days"+(plan("workdays")!==null?" capped at "+plan("workdays")+" budgeted":""),false);
+}
+
+// ── advisors ──
+function renderAdvisors(){
+  var b=B(),rows=day==="mtd"?b.advisors:advisorsForDay(day);
+  var cols=typeCols();
+  var h1='<tr><th rowspan="2" style="vertical-align:bottom">Advisor</th><th colspan="6" class="grp">Totals</th>'+
+    cols.map(function(t){return'<th colspan="3" class="grp tt-'+t[2]+'">'+t[1]+'</th>'}).join("")+'</tr>';
+  var h2='<tr><th class="grp">Leads</th><th>Sold</th><th>Close</th><th>Revenue</th><th>Avg Sale</th><th>$/Lead</th>'+
+    cols.map(function(){return'<th class="grp">Leads</th><th>Sold</th><th>Revenue</th>'}).join("")+'</tr>';
+  var body=rows.map(function(a,i){
+    var t=a.total;
+    var tr='<tr><td><span class="rankn">'+(i+1)+'</span> '+a.name+'</td>'+
+      '<td class="grp">'+n0(t.leads)+'</td><td>'+n0(t.sold)+'</td><td>'+pct(t.sold,t.leads)+'</td>'+
+      '<td><b>'+fmt$0(t.revenue)+'</b></td>'+
+      '<td>'+(t.sold?fmt$(t.revenue/t.sold):'<span class="dash">&mdash;</span>')+'</td>'+
+      '<td>'+(t.leads?fmt$(t.revenue/t.leads):'<span class="dash">&mdash;</span>')+'</td>';
+    cols.forEach(function(c){
+      var x=a.types[c[0]];
+      tr+='<td class="grp">'+n0(x.leads)+'</td><td>'+n0(x.sold)+'</td><td>'+fmt$0(x.revenue)+'</td>';
+    });
+    return tr+'</tr>';
+  }).join("");
+  var tot={leads:0,sold:0,revenue:0},ttypes={};
+  cols.forEach(function(c){ttypes[c[0]]={leads:0,sold:0,revenue:0}});
+  rows.forEach(function(a){
+    tot.leads+=a.total.leads;tot.sold+=a.total.sold;tot.revenue+=a.total.revenue;
+    cols.forEach(function(c){var x=a.types[c[0]];ttypes[c[0]].leads+=x.leads;ttypes[c[0]].sold+=x.sold;ttypes[c[0]].revenue+=x.revenue});
+  });
+  var trow='<tr class="tot"><td>TEAM</td><td class="grp">'+tot.leads+'</td><td>'+tot.sold+'</td><td>'+pct(tot.sold,tot.leads)+'</td>'+
+    '<td>'+fmt$(tot.revenue)+'</td><td>'+(tot.sold?fmt$(tot.revenue/tot.sold):"&mdash;")+'</td><td>'+(tot.leads?fmt$(tot.revenue/tot.leads):"&mdash;")+'</td>'+
+    cols.map(function(c){var x=ttypes[c[0]];return'<td class="grp">'+x.leads+'</td><td>'+x.sold+'</td><td>'+fmt$0(x.revenue)+'</td>'}).join("")+'</tr>';
+  var empty='<div style="text-align:center;padding:40px;color:var(--faint);font-weight:600">No advisor activity for this day.</div>';
+  var inner=rows.length?'<div class="tbl-scroll"><table class="g"><thead>'+h1+h2+'</thead><tbody>'+body+trow+'</tbody></table></div>':empty;
+  document.getElementById("app").innerHTML=shell(inner,
+    "Leads = completed sales-BU runs, day of run &middot; sold + revenue = the CA's sold estimates, day sold",true);
+}
+
+// ── turnovers ──
+function renderTurnovers(){
+  var b=B(),rows=day==="mtd"?b.techs:techsForDay(day);
+  var h1='<tr><th rowspan="2" style="vertical-align:bottom">Technician</th>'+
+    '<th colspan="3" class="grp">Opportunities Ran</th><th colspan="3" class="grp">Turned Over</th>'+
+    '<th rowspan="2" style="vertical-align:bottom">TO Rate</th><th colspan="2" class="grp">T/O Ran</th>'+
+    '<th colspan="2" class="grp">Sales from Turns</th></tr>';
+  var h2='<tr><th class="grp">COD</th><th>Maint</th><th>Total</th>'+
+    '<th class="grp">COD</th><th>Maint</th><th>Total</th>'+
+    '<th class="grp">COD</th><th>Maint</th><th class="grp"># Sold</th><th>Revenue</th></tr>';
+  var sums=dict0();
+  function dict0(){var o={};T_FIELDS.forEach(function(f){o[f]=0});o.opps=0;o.turns=0;return o}
+  var body=rows.map(function(r,i){
+    T_FIELDS.forEach(function(f){sums[f]+=r[f]||0});sums.opps+=r.opps;sums.turns+=r.turns;
+    return'<tr><td><span class="rankn">'+(i+1)+'</span> '+r.name+'</td>'+
+      '<td class="grp">'+n0(r.codOpp)+'</td><td>'+n0(r.maintOpp)+'</td><td><b>'+n0(r.opps)+'</b></td>'+
+      '<td class="grp">'+n0(r.codTurn)+'</td><td>'+n0(r.maintTurn)+'</td><td><b>'+n0(r.turns)+'</b></td>'+
+      '<td>'+pct(r.turns,r.opps)+'</td>'+
+      '<td class="grp">'+n0(r.codRan)+'</td><td>'+n0(r.maintRan)+'</td>'+
+      '<td class="grp">'+n0(r.codSold+r.maintSold)+'</td><td><b>'+fmt$0(r.codRev+r.maintRev)+'</b></td></tr>';
+  }).join("");
+  var trow='<tr class="tot"><td>TEAM</td>'+
+    '<td class="grp">'+sums.codOpp+'</td><td>'+sums.maintOpp+'</td><td>'+sums.opps+'</td>'+
+    '<td class="grp">'+sums.codTurn+'</td><td>'+sums.maintTurn+'</td><td>'+sums.turns+'</td>'+
+    '<td>'+pct(sums.turns,sums.opps)+'</td>'+
+    '<td class="grp">'+(sums.codRan)+'</td><td>'+(sums.maintRan)+'</td>'+
+    '<td class="grp">'+(sums.codSold+sums.maintSold)+'</td><td>'+fmt$(sums.codRev+sums.maintRev)+'</td></tr>';
+  var empty='<div style="text-align:center;padding:40px;color:var(--faint);font-weight:600">No technician activity for this day.</div>';
+  var inner=rows.length?'<div class="tbl-scroll"><table class="g"><thead>'+h1+h2+'</thead><tbody>'+body+trow+'</tbody></table></div>':empty;
+  document.getElementById("app").innerHTML=shell(inner,
+    "Opps = completed opportunity jobs in the HVAC demand/maintenance BUs &middot; turns = sales jobs the tech generated (canceled excluded) &middot; sales credit the generating tech",true);
+}
+
+// ── setup ──
+function renderSetup(){
+  var p=planCalc();
+  function row(f,l){
+    var v=plan(f);
+    return'<div class="row edit" onclick="editPlan(\''+f+'\',\''+l+'\')"><span>'+l+'</span><b>'+(v===null?'<span class="dash">tap to set</span>':(f.indexOf("avg")===0?fmt$(v):v+(f.indexOf("close")===0||f==="toRate"?"%":"")))+'</b></div>';
+  }
+  var boxes='<div class="setup-grid">'+
+    '<div class="setup-box"><h3>Month Basics</h3>'+row("workdays","Budgeted work days")+row("svcCalls","Budgeted service calls")+row("toRate","Planned turnover rate %")+'</div>'+
+    '<div class="setup-box"><h3>Budgeted Leads</h3>'+row("mktLeads","Marketed leads budgeted")+(B().hasCostco?row("costcoLeads","Costco leads budgeted"):"")+row("selfLeads","Self-gen leads budgeted")+'</div>'+
+    '<div class="setup-box"><h3>Close % by Lead Type</h3>'+row("closeTurn","Turnover close %")+row("closeMkt","Marketed close %")+(B().hasCostco?row("closeCostco","Costco close %"):"")+row("closeSelf","Self-gen close %")+'</div>'+
+    '<div class="setup-box"><h3>Average Ticket by Lead Type</h3>'+row("avgTurn","Turnover avg ticket $")+row("avgMkt","Marketed avg ticket $")+(B().hasCostco?row("avgCostco","Costco avg ticket $"):"")+row("avgSelf","Self-gen avg ticket $")+'</div>'+
+  '</div>';
+  var rows="";
+  typeCols().forEach(function(t){
+    var e=p.types[t[0]];
+    rows+='<tr><td class="tt-'+t[2]+'" style="font-weight:800">'+t[1]+'</td>'+
+      '<td>'+(e.leads!==null?Math.round(e.leads):"&mdash;")+'</td>'+
+      '<td>'+(e.close!==null?e.close+"%":"&mdash;")+'</td>'+
+      '<td>'+(e.sales!==null?e.sales.toFixed(1):"&mdash;")+'</td>'+
+      '<td>'+(e.avg!==null?fmt$(e.avg):"&mdash;")+'</td>'+
+      '<td>'+(e.revenue!==null?fmt$(e.revenue):"&mdash;")+'</td></tr>';
+  });
+  rows+='<tr class="tot"><td>PLANNED MONTH</td><td></td><td></td><td>'+(p.sales!==null?p.sales.toFixed(1):"&mdash;")+'</td><td></td><td>'+(p.revenue!==null?fmt$(p.revenue):"&mdash;")+'</td></tr>';
+  var tbl='<div class="sect">What the Plan Works Out To</div><div class="tbl-scroll"><table class="g" style="min-width:560px"><thead><tr>'+
+    '<th>Lead Type</th><th>Planned Leads</th><th>Close %</th><th>Planned Sales</th><th>Avg Ticket</th><th>Planned Revenue</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+  document.getElementById("app").innerHTML=shell(boxes+tbl,
+    "Tap any value to edit &middot; edits ask for the PIN once and are shared with every viewer &middot; planned turnover leads = service calls &times; turnover rate",false);
+}
+
+function render(){
+  var app=document.getElementById("app");
+  if(feedError&&!data){app.innerHTML='<div style="text-align:center;padding:80px 20px;color:var(--faint);font-weight:600">'+feedError+'</div>';return}
+  if(!data)return;
+  document.documentElement.setAttribute("data-co",co);
+  if(view==="adv")renderAdvisors();
+  else if(view==="turn")renderTurnovers();
+  else if(view==="setup")renderSetup();
+  else renderScore();
+}
+function setCo(c){co=c;localStorage.setItem(CO_KEY,c);render()}
+function setView(v){view=v;localStorage.setItem(VIEW_KEY,v);render()}
+function setDay(d){day=d;render()}
+
+// ── data feed ──
+async function fetchData(){
+  try{
+    var r=await fetch(DATA_URL+"?t="+Date.now(),{cache:"no-store"});
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    data=await r.json();feedError=null;
+  }catch(e){
+    console.error(e);
+    feedError=data?"Data feed temporarily unavailable - showing the last good pull.":"Data feed unavailable - try again in a minute.";
+  }
+}
+async function refresh(){await Promise.all([fetchData(),loadSettings()]);render()}
+
+// ── access gate (hosted mode only; same code as the Command Center) ──
+const ACCESS_HASH="d8305f8a240c399b7b692b604e648533d54b1eb84105f8c9b1d3fa6a55f65120";
+const ACCESS_KEY="cc-access-v1";
+async function sha256hex(s){
+  var b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));
+  return[...new Uint8Array(b)].map(function(x){return x.toString(16).padStart(2,"0")}).join("");
+}
+async function gate(){
+  var isLocal=location.protocol!=="https:";
+  if(isLocal||!window.isSecureContext)return true;
+  if(sessionStorage.getItem(ACCESS_KEY)===ACCESS_HASH)return true;
+  for(;;){
+    var code=prompt("Comfort Report\n\nEnter access code:");
+    if(code===null)continue;
+    if(await sha256hex(code.trim())===ACCESS_HASH){sessionStorage.setItem(ACCESS_KEY,ACCESS_HASH);return true}
+    alert("Wrong access code.");
+  }
+}
+gate().then(refresh);
+setInterval(refresh,REFRESH_MINUTES*60*1000);
+</script>
+</body>
+</html>
