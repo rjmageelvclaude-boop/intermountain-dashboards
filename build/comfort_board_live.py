@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Live ServiceTitan engine for the Nexstar Comfort Report board
+Live ServiceTitan engine for the CASPR (comfort report) board
 (site/comfort-board/).
 
 Replaces the monthly "MASTER NEXTSTAR COMFORT REPORT" workbook: per company

@@ -300,7 +300,7 @@ function techDayTurns(id){
   };
 }
 
-// planned monthly expectations, the Nexstar way: leads x close% x avg ticket
+// planned monthly expectations: leads x close% x avg ticket
 function planCalc(){
   var svc=plan("svcCalls"),to=plan("toRate");
   var leads={turnover:svc!==null&&to!==null?svc*to/100:null,
