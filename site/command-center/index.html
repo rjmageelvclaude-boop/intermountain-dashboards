@@ -264,6 +264,23 @@ function setViewDate(v){
   render();
 }
 
+// ── Code Pink clear: silences the blinking overlay on THIS device only. The
+// dismissal is keyed to company + day + the exact set of alert jobs, so a new
+// Code Pink job (or the next day) starts the blinking again automatically.
+const PINK_KEY="cc-pink-cleared";
+function pinkSig(list){
+  var jobs=(list||[]).filter(function(r){return r.codePink}).map(function(r){return r.jobNumber}).sort();
+  return act+"|"+toYMD(new Date())+"|"+jobs.join(",");
+}
+function pinkCleared(){try{return JSON.parse(localStorage.getItem(PINK_KEY)||"{}")}catch(e){return{}}}
+function clearCodePink(){
+  var st=pinkCleared(),today=toYMD(new Date());
+  Object.keys(st).forEach(function(k){if(k.split("|")[1]!==today)delete st[k]});
+  st[pinkSig((sd[act]||{}).installCallbacksToday||[])]=true;
+  localStorage.setItem(PINK_KEY,JSON.stringify(st));
+  render();
+}
+
 function render(){
   var co=CO[act],c=co.color;
   document.documentElement.style.setProperty("--co",c);
@@ -390,7 +407,12 @@ function render(){
     cbB=divd("Callbacks")+'<div class="metric-row"><div class="dot" style="visibility:hidden"></div><div class="m-label" style="color:#94a3b8">Callback list is live-only — go Back to Today to see it</div></div>';
   }
   var codePink=cbAlerts>0&&!viewDate;
-  var instSummary=viewDate?null:(codePink?'<span style="color:#ec4899">🚨 CODE PINK ×'+cbAlerts+'</span>':cbList.length+" callback"+(cbList.length===1?"":"s")+" today");
+  var pinkBlink=codePink&&!pinkCleared()[pinkSig(cbList)];
+  var instSummary=viewDate?null:(codePink
+    ?'<span style="color:#ec4899">🚨 CODE PINK ×'+cbAlerts+'</span>'+(pinkBlink
+      ?'<button onclick="clearCodePink()" title="Stop the blinking on this device — a new Code Pink starts it again" style="background:#ec4899;color:#fff;border:none;border-radius:4px;padding:2px 10px;font-size:10px;font-weight:700;cursor:pointer;margin-left:8px;vertical-align:1px">Clear</button>'
+      :'<span style="font-size:10px;color:#94a3b8;font-weight:600;margin-left:6px">cleared</span>')
+    :cbList.length+" callback"+(cbList.length===1?"":"s")+" today");
 
   var bHtml=bFields.map(function(b){
     var val=b.type==="text"?gbs(act,b.k):gb(act,b.k);
@@ -423,7 +445,7 @@ function render(){
     sec("HVAC Sales","📊",c,co.lg,totalHS>0?"$"+totalHS.toLocaleString():null,sB)+
     sec("Installs","🏗️",codePink?"#ec4899":c,co.lg,instSummary,sparkHdr+instB+cbB)+
     '</div></div><div class="footer">Live from the ServiceTitan API · Budgeted days auto calculated from weekdays · Weekends excluded from sparklines · Date picker shows historical data</div></div>'+
-    (codePink?'<div class="code-pink-overlay"></div>':'');
+    (pinkBlink?'<div class="code-pink-overlay"></div>':'');
 }
 // ── Access gate (hosted mode only) ─────────────────────────────────────────
 // SHA-256 of the access code. To change the code: run in the browser console
