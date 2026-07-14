@@ -557,10 +557,10 @@ function renderTurnovers(){
     '<th rowspan="2" style="vertical-align:bottom" class="grp">ROPPs Ran</th>'+
     '<th colspan="'+(mtd?4:3)+'" class="grp">Turned Over</th>'+
     '<th rowspan="2" style="vertical-align:bottom">TO Rate</th><th colspan="2" class="grp">T/O Ran</th>'+
-    '<th colspan="2" class="grp">Sales from Turns</th></tr>';
+    '<th colspan="3" class="grp">Sales from Turns</th></tr>';
   var h2='<tr><th class="grp">COD</th><th>Maint</th><th>Total</th>'+
     '<th class="grp">COD</th><th>Maint</th><th>Total</th>'+(mtd?'<th>3-Day</th>':'')+
-    '<th class="grp">COD</th><th>Maint</th><th class="grp"># Sold</th><th>Revenue</th></tr>';
+    '<th class="grp">COD</th><th>Maint</th><th class="grp"># Sold</th><th>Revenue</th><th>$/Opp</th></tr>';
   var sums=dict0();
   function dict0(){var o={};T_FIELDS.forEach(function(f){o[f]=0});o.opps=0;o.turns=0;return o}
   var body=rows.map(function(r,i){
@@ -572,7 +572,8 @@ function renderTurnovers(){
       (mtd?'<td>'+trendHtml(trendCalc(techDayTurns(r.id)),r.name+" turns/day")+'</td>':'')+
       '<td>'+pct(r.turns,r.ropps||0)+'</td>'+
       '<td class="grp">'+n0(r.codRan)+'</td><td>'+n0(r.maintRan)+'</td>'+
-      '<td class="grp">'+n0(r.codSold+r.maintSold)+'</td><td><b>'+fmt$0(r.codRev+r.maintRev)+'</b></td></tr>';
+      '<td class="grp">'+n0(r.codSold+r.maintSold)+'</td><td><b>'+fmt$0(r.codRev+r.maintRev)+'</b></td>'+
+      '<td>'+(r.opps?fmt$((r.codRev+r.maintRev)/r.opps):'<span class="dash">&mdash;</span>')+'</td></tr>';
   }).join("");
   var trow='<tr class="tot"><td>TEAM</td>'+
     '<td class="grp">'+sums.codOpp+'</td><td>'+sums.maintOpp+'</td><td>'+sums.opps+'</td>'+
@@ -581,11 +582,12 @@ function renderTurnovers(){
     (mtd?'<td>'+trendChip("turns","Team turns/day")+'</td>':'')+
     '<td>'+pct(sums.turns,sums.ropps)+'</td>'+
     '<td class="grp">'+(sums.codRan)+'</td><td>'+(sums.maintRan)+'</td>'+
-    '<td class="grp">'+(sums.codSold+sums.maintSold)+'</td><td>'+fmt$(sums.codRev+sums.maintRev)+'</td></tr>';
+    '<td class="grp">'+(sums.codSold+sums.maintSold)+'</td><td>'+fmt$(sums.codRev+sums.maintRev)+'</td>'+
+    '<td>'+(sums.opps?fmt$((sums.codRev+sums.maintRev)/sums.opps):'<span class="dash">&mdash;</span>')+'</td></tr>';
   var empty='<div style="text-align:center;padding:40px;color:var(--faint);font-weight:600">No technician activity for this day.</div>';
   var inner=rows.length?'<div class="tbl-scroll"><table class="g"><thead>'+h1+h2+'</thead><tbody>'+body+trow+'</tbody></table></div>':empty;
   document.getElementById("app").innerHTML=shell(inner,
-    "Opps = completed opportunity jobs in the HVAC demand/maintenance BUs &middot; ROPPs = ROPP-tagged completed jobs (net of Management Removed) &middot; TO Rate = turns &divide; ROPPs ran &middot; turns = sales jobs the tech generated (canceled excluded) &middot; sales credit the generating tech"+(mtd?" &middot; 3-Day = the tech's turns/day, last "+TREND_DAYS+" full days vs the "+TREND_DAYS+" before":""),true);
+    "Opps = completed opportunity jobs in the HVAC demand/maintenance BUs &middot; ROPPs = ROPP-tagged completed jobs (net of Management Removed) &middot; TO Rate = turns &divide; ROPPs ran &middot; turns = sales jobs the tech generated (canceled excluded) &middot; sales credit the generating tech &middot; $/Opp = turn revenue &divide; opportunities ran"+(mtd?" &middot; 3-Day = the tech's turns/day, last "+TREND_DAYS+" full days vs the "+TREND_DAYS+" before":""),true);
 }
 
 // ── setup ──
