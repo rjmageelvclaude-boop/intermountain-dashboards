@@ -360,7 +360,7 @@ function advisorsForDay(iso){
   }).filter(function(a){return a.total.leads||a.total.sold||a.total.revenue})
     .sort(function(x,y){return y.total.revenue-x.total.revenue||y.total.leads-x.total.leads});
 }
-const T_FIELDS=["codOpp","maintOpp","codTurn","maintTurn","codRan","maintRan","codSold","codRev","maintSold","maintRev"];
+const T_FIELDS=["codOpp","maintOpp","ropps","codTurn","maintTurn","codRan","maintRan","codSold","codRev","maintSold","maintRev"];
 function techsForDay(iso){
   var b=B(),d=b.techDaily[iso]||{};
   var byId={};b.techs.forEach(function(t){byId[String(t.id)]=t.name});
@@ -369,7 +369,7 @@ function techsForDay(iso){
     T_FIELDS.forEach(function(f){row[f]=d[tid][f]||0});
     row.opps=row.codOpp+row.maintOpp;row.turns=row.codTurn+row.maintTurn;
     return row;
-  }).filter(function(r){return r.opps||r.turns||r.codRan+r.maintRan||r.codRev+r.maintRev})
+  }).filter(function(r){return r.opps||r.ropps||r.turns||r.codRan+r.maintRan||r.codRev+r.maintRev})
     .sort(function(x,y){return(y.codRev+y.maintRev)-(x.codRev+x.maintRev)||y.turns-x.turns});
 }
 
@@ -415,8 +415,8 @@ function renderScore(){
   var pace=clock.elapsed?rev/clock.elapsed*clock.total:0;
   var toDate=p.revenue!==null&&clock.total?p.revenue*clock.elapsed/clock.total:null;
 
-  var turns=0,opps=0;
-  b.techs.forEach(function(t){turns+=t.turns;opps+=t.opps});
+  var turns=0,ropps=0;
+  b.techs.forEach(function(t){turns+=t.turns;ropps+=(t.ropps||0)});
   var toPlan=plan("toRate");
 
   var cards='<div class="cards">'+
@@ -433,8 +433,8 @@ function renderScore(){
       '<div class="c-sub">'+m._total.sold+' of '+m._total.leads+' leads '+trendChip("close","Close rate")+'</div></div>'+
     '<div class="card"><div class="c-label">Avg Sale</div><div class="c-val">'+(m._total.sold?fmt$(rev/m._total.sold):"&mdash;")+'</div>'+
       '<div class="c-sub">'+(m._total.leads?fmt$(rev/m._total.leads)+" per lead ran":"")+'</div></div>'+
-    '<div class="card"><div class="c-label">Turnover Rate</div><div class="c-val">'+(opps?Math.round(turns/opps*100)+"%":"&mdash;")+'</div>'+
-      '<div class="c-sub">'+turns+' turns on '+opps+' opps'+(toPlan!==null?' &middot; plan '+toPlan+'%':'')+' '+trendChip("turns","Turns per day")+'</div></div>'+
+    '<div class="card"><div class="c-label">Turnover Rate</div><div class="c-val">'+(ropps?Math.round(turns/ropps*100)+"%":"&mdash;")+'</div>'+
+      '<div class="c-sub">'+turns+' turns on '+ropps+' ROPPs ran'+(toPlan!==null?' &middot; plan '+toPlan+'%':'')+' '+trendChip("turns","Turns per day")+'</div></div>'+
     '<div class="card"><div class="c-label">Turnover Cancels</div><div class="c-val">'+b.turnoverCancels+'</div>'+
       '<div class="c-sub">'+pct(b.turnoverCancels,turns+b.turnoverCancels)+' of turns booked</div></div>'+
   '</div>';
@@ -497,12 +497,12 @@ function renderScore(){
     }).join("")+'</tbody></table></div></div>';
   var topTech=b.techs.slice(0,5),maxT=topTech.length?Math.max(topTech[0].codRev+topTech[0].maintRev,1):1;
   var techTbl='<div><div class="sect">Top Turnover Techs &middot; MTD</div><div class="tbl-scroll"><table class="g"><thead><tr>'+
-    '<th>Technician</th><th>Turn Revenue</th><th>Turns / Opps</th><th>TO Rate</th></tr></thead><tbody>'+
+    '<th>Technician</th><th>Turn Revenue</th><th>Turns / ROPPs</th><th>TO Rate</th></tr></thead><tbody>'+
     topTech.map(function(r,i){
       var rv=r.codRev+r.maintRev;
       return'<tr><td><span class="rankn">'+(i+1)+'</span> '+r.name+'</td>'+
         '<td>'+fmt$(rv)+'<span class="rbar"><i style="width:'+(rv/maxT*100).toFixed(0)+'%"></i></span></td>'+
-        '<td>'+r.turns+' / '+r.opps+'</td><td>'+pct(r.turns,r.opps)+'</td></tr>';
+        '<td>'+r.turns+' / '+(r.ropps||0)+'</td><td>'+pct(r.turns,r.ropps||0)+'</td></tr>';
     }).join("")+'</tbody></table></div></div>';
 
   document.getElementById("app").innerHTML=shell(cards+tbl+daily+'<div class="duo">'+advTbl+techTbl+'</div>',
@@ -551,7 +551,9 @@ function renderAdvisors(){
 function renderTurnovers(){
   var b=B(),rows=day==="mtd"?b.techs:techsForDay(day),mtd=day==="mtd";
   var h1='<tr><th rowspan="2" style="vertical-align:bottom">Technician</th>'+
-    '<th colspan="3" class="grp">Opportunities Ran</th><th colspan="'+(mtd?4:3)+'" class="grp">Turned Over</th>'+
+    '<th colspan="3" class="grp">Opportunities Ran</th>'+
+    '<th rowspan="2" style="vertical-align:bottom" class="grp">ROPPs Ran</th>'+
+    '<th colspan="'+(mtd?4:3)+'" class="grp">Turned Over</th>'+
     '<th rowspan="2" style="vertical-align:bottom">TO Rate</th><th colspan="2" class="grp">T/O Ran</th>'+
     '<th colspan="2" class="grp">Sales from Turns</th></tr>';
   var h2='<tr><th class="grp">COD</th><th>Maint</th><th>Total</th>'+
@@ -563,23 +565,25 @@ function renderTurnovers(){
     T_FIELDS.forEach(function(f){sums[f]+=r[f]||0});sums.opps+=r.opps;sums.turns+=r.turns;
     return'<tr><td><span class="rankn">'+(i+1)+'</span> '+r.name+'</td>'+
       '<td class="grp">'+n0(r.codOpp)+'</td><td>'+n0(r.maintOpp)+'</td><td><b>'+n0(r.opps)+'</b></td>'+
+      '<td class="grp"><b>'+n0(r.ropps||0)+'</b></td>'+
       '<td class="grp">'+n0(r.codTurn)+'</td><td>'+n0(r.maintTurn)+'</td><td><b>'+n0(r.turns)+'</b></td>'+
       (mtd?'<td>'+trendHtml(trendCalc(techDayTurns(r.id)),r.name+" turns/day")+'</td>':'')+
-      '<td>'+pct(r.turns,r.opps)+'</td>'+
+      '<td>'+pct(r.turns,r.ropps||0)+'</td>'+
       '<td class="grp">'+n0(r.codRan)+'</td><td>'+n0(r.maintRan)+'</td>'+
       '<td class="grp">'+n0(r.codSold+r.maintSold)+'</td><td><b>'+fmt$0(r.codRev+r.maintRev)+'</b></td></tr>';
   }).join("");
   var trow='<tr class="tot"><td>TEAM</td>'+
     '<td class="grp">'+sums.codOpp+'</td><td>'+sums.maintOpp+'</td><td>'+sums.opps+'</td>'+
+    '<td class="grp">'+sums.ropps+'</td>'+
     '<td class="grp">'+sums.codTurn+'</td><td>'+sums.maintTurn+'</td><td>'+sums.turns+'</td>'+
     (mtd?'<td>'+trendChip("turns","Team turns/day")+'</td>':'')+
-    '<td>'+pct(sums.turns,sums.opps)+'</td>'+
+    '<td>'+pct(sums.turns,sums.ropps)+'</td>'+
     '<td class="grp">'+(sums.codRan)+'</td><td>'+(sums.maintRan)+'</td>'+
     '<td class="grp">'+(sums.codSold+sums.maintSold)+'</td><td>'+fmt$(sums.codRev+sums.maintRev)+'</td></tr>';
   var empty='<div style="text-align:center;padding:40px;color:var(--faint);font-weight:600">No technician activity for this day.</div>';
   var inner=rows.length?'<div class="tbl-scroll"><table class="g"><thead>'+h1+h2+'</thead><tbody>'+body+trow+'</tbody></table></div>':empty;
   document.getElementById("app").innerHTML=shell(inner,
-    "Opps = completed opportunity jobs in the HVAC demand/maintenance BUs &middot; turns = sales jobs the tech generated (canceled excluded) &middot; sales credit the generating tech"+(mtd?" &middot; 3-Day = the tech's turns/day, last "+TREND_DAYS+" full days vs the "+TREND_DAYS+" before":""),true);
+    "Opps = completed opportunity jobs in the HVAC demand/maintenance BUs &middot; ROPPs = ROPP-tagged completed jobs (net of Management Removed) &middot; TO Rate = turns &divide; ROPPs ran &middot; turns = sales jobs the tech generated (canceled excluded) &middot; sales credit the generating tech"+(mtd?" &middot; 3-Day = the tech's turns/day, last "+TREND_DAYS+" full days vs the "+TREND_DAYS+" before":""),true);
 }
 
 // ── setup ──
