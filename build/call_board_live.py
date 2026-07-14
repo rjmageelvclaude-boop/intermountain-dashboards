@@ -2,13 +2,17 @@
 """
 Live ServiceTitan engine for the 4 Day Call board.
 
-Five boards, each a (company, trade) pair scoped to specific business units:
+Nine boards, each a (company, trade) pair scoped to specific business units:
 
-    sierra-hvac        SIE   HVAC - Service, HVAC - Maintenance
-    sierra-plumbing    SIE   Plumbing - Service, Plumbing - Maintenance, Plumbing - Drains
-    ultimate-hvac      ULT   HVAC - Service, HVAC - Maintenance
-    ultimate-plumbing  ULT   Plumbing - Service, Plumbing - Maintenance
-    russett-hvac       RUS   HVAC - Service, HVAC - Maintenance
+    sierra-hvac           SIE   HVAC - Service, HVAC - Maintenance
+    sierra-plumbing       SIE   Plumbing - Service, Plumbing - Maintenance, Plumbing - Drains
+    ultimate-hvac         ULT   HVAC - Service, HVAC - Maintenance
+    ultimate-plumbing     ULT   Plumbing - Service, Plumbing - Maintenance
+    russett-hvac          RUS   HVAC - Service, HVAC - Maintenance
+    brothers-hvac         BRO   HVAC Service, HVAC Maintenance
+    brothers-plumbing     BRO   Plumbing Service, Plumbing Maintenance, Drain Cleaning
+    brothers-electrical   BRO   Electrical Service, Electrical Maintenance
+    brothers-excavation   BRO   Excavation Sales, Excavation Install
 
 Per board, for each of the next 4 calendar days (starting today, company-local):
   - opps / nonOpps = calls on board (jobs with an appointment that day, not
@@ -98,6 +102,22 @@ COMPANIES = {
             {"key": "hvac_mnt", "label": "Maint.", "group": "HVAC", "bu": 53208412},
         ],
     },
+    "brothers": {
+        "tenant": "BRO", "tz": "mountain",
+        "name": "Brothers Plumbing Heating & Electric", "short": "Brothers",
+        "weather": {"lat": 39.739, "lon": -104.985, "tz": "America/Denver"},     # Denver
+        "cols": [
+            {"key": "hvac_svc", "label": "Service", "group": "HVAC", "bu": 2218904},
+            {"key": "hvac_mnt", "label": "Maint.", "group": "HVAC", "bu": 14821223},
+            {"key": "plumb_svc", "label": "Service", "group": "Plumbing", "bu": 2218910},
+            {"key": "plumb_mnt", "label": "Maint.", "group": "Plumbing", "bu": 14821351},
+            {"key": "plumb_drn", "label": "Drains", "group": "Plumbing", "bu": 19583412},
+            {"key": "elec_svc", "label": "Service", "group": "Electrical", "bu": 2218916},
+            {"key": "elec_mnt", "label": "Maint.", "group": "Electrical", "bu": 14821224},
+            {"key": "excav_sls", "label": "Sales", "group": "Excavation", "bu": 548686598},
+            {"key": "excav_ins", "label": "Install", "group": "Excavation", "bu": 2218912},
+        ],
+    },
 }
 
 BOARDS = {
@@ -134,6 +154,36 @@ BOARDS = {
         "title": "HVAC - Service & Maintenance",
         "bus": [221, 53208412],
         "ropp_tags": [63640008],           # "ROPP"
+        "ropp_removed_tags": [],
+    },
+    # Brothers has no ROPP/TROPP tags - "Replacement Opportunity" (85) is the
+    # opportunity marker on every trade (RJ 2026-07-13).
+    "brothers-hvac": {
+        "company": "brothers", "trade": "HVAC",
+        "title": "HVAC - Service & Maintenance",
+        "bus": [2218904, 14821223],
+        "ropp_tags": [85],
+        "ropp_removed_tags": [],
+    },
+    "brothers-plumbing": {
+        "company": "brothers", "trade": "Plumbing",
+        "title": "Plumbing - Service, Maintenance & Drains",
+        "bus": [2218910, 14821351, 19583412],
+        "ropp_tags": [85],
+        "ropp_removed_tags": [],
+    },
+    "brothers-electrical": {
+        "company": "brothers", "trade": "Electrical",
+        "title": "Electrical - Service & Maintenance",
+        "bus": [2218916, 14821224],
+        "ropp_tags": [85],
+        "ropp_removed_tags": [],
+    },
+    "brothers-excavation": {
+        "company": "brothers", "trade": "Excavation",
+        "title": "Excavation - Sales & Install",
+        "bus": [548686598, 2218912],
+        "ropp_tags": [85],
         "ropp_removed_tags": [],
     },
 }

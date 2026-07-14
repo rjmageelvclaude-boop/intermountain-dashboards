@@ -18,7 +18,7 @@ body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:#f6f8fb;min-
 .btn:hover{background:rgba(255,255,255,.15)}
 .btn.active{background:var(--co)}
 .last-pull{font-size:10px;color:#475569;display:flex;align-items:center;gap:4px}
-.portfolio-strip{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:20px}
+.portfolio-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:20px}
 .port-card{border-radius:10px;padding:12px 16px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
 .port-card.off{background:#fff;border:1px solid #e8ecf1}
 .port-card.on{color:#fff;border:1px solid transparent;box-shadow:0 4px 12px rgba(0,0,0,.15)}
@@ -117,12 +117,17 @@ const DATA_URL=IS_LOCAL?"/data":(IS_FILE?"http://localhost:8778/data":"data.json
 const CO={
   sierra:{name:"Sierra Air Conditioning & Plumbing",short:"Sierra",color:"#2563eb",grad:"linear-gradient(135deg,#2563eb,#1d4ed8)",lg:"linear-gradient(135deg,#eff6ff,#dbeafe)",plumb:true,costco:true},
   ultimate:{name:"Ultimate Heating Air & Plumbing",short:"Ultimate",color:"#7c3aed",grad:"linear-gradient(135deg,#7c3aed,#6d28d9)",lg:"linear-gradient(135deg,#f5f3ff,#ede9fe)",plumb:true,costco:false},
-  russett:{name:"Russett Southwest",short:"Russett",color:"#dc2626",grad:"linear-gradient(135deg,#dc2626,#b91c1c)",lg:"linear-gradient(135deg,#fef2f2,#fee2e2)",plumb:false,costco:false}
+  russett:{name:"Russett Southwest",short:"Russett",color:"#dc2626",grad:"linear-gradient(135deg,#dc2626,#b91c1c)",lg:"linear-gradient(135deg,#fef2f2,#fee2e2)",plumb:false,costco:false},
+  // Brothers runs no comfort-advisor model: turnover:true relabels the TGL
+  // machinery (tgl* keys carry service-generated sales; tglsSet = sales-BU
+  // jobs following a service visit within 30 days).
+  brothers:{name:"Brothers Plumbing Heating & Electric",short:"Brothers",color:"#ea580c",grad:"linear-gradient(135deg,#ea580c,#c2410c)",lg:"linear-gradient(135deg,#fff7ed,#ffedd5)",plumb:true,costco:false,elec:true,excav:true,turnover:true}
 };
 
 const now=new Date();
 const hr=now.getHours(),greet=hr<12?"Good morning":hr<17?"Good afternoon":"Good evening";
-let act="sierra",sd={sierra:{},ultimate:{},russett:{}},hist={sierra:[],ultimate:[],russett:[]};
+let act="sierra",sd={},hist={};
+for(var k0 in CO){sd[k0]={};hist[k0]=[]}
 let budgets=JSON.parse(localStorage.getItem("pcc-b7")||"{}"),sOpen=false,lp=null;
 let budgetsSynced=false; // true once shared budgets load from the Apps Script
 const PIN_KEY="pcc-pin";
@@ -239,8 +244,8 @@ function sec(t,icon,color,lg,summary,body){
 var feedError=null,feedSource=null;
 function applyFeed(j){
   if(j.current){sd=j.current}else{sd=j}
-  sd.sierra=sd.sierra||{};sd.ultimate=sd.ultimate||{};sd.russett=sd.russett||{};
-  if(j.history){hist=j.history;hist.sierra=hist.sierra||[];hist.ultimate=hist.ultimate||[];hist.russett=hist.russett||[]}
+  for(var k in CO){sd[k]=sd[k]||{}}
+  if(j.history){hist=j.history;for(var k2 in CO){hist[k2]=hist[k2]||[]}}
 }
 async function fetchData(force){
   var url=DATA_URL+((IS_LOCAL||IS_FILE)&&force?"?refresh=1":"");
@@ -327,7 +332,7 @@ function render(){
   var plumbAvg=plumbRan>0?g("plumbRevenue")/plumbRan:0;
   var totalHS=g("tglTotalSales")+g("mktTotalSales")+(co.costco?g("costcoTotalSales"):0);
   var lastUpd=(viewDate?getHistoricalData():sd[act]).lastUpdated||"Not yet";
-  var totalCanceled=g("hvacSMCanceled")+g("hvacSalesCanceled")+(co.plumb?g("plumbCanceled"):0);
+  var totalCanceled=g("hvacSMCanceled")+g("hvacSalesCanceled")+(co.plumb?g("plumbCanceled"):0)+(co.elec?g("elecCanceled"):0)+(co.excav?g("excavCanceled"):0);
 
   var bFields=[
     {k:"dailyRevenueBudget",l:"Daily Revenue Budget",type:"number"},
@@ -336,6 +341,7 @@ function render(){
     {k:"monthlyPlan",l:"Monthly Plan",type:"number"},
     {k:"hvacJobBudget",l:"HVAC Job Budget",type:"number"},
     ...(co.plumb?[{k:"plumbJobBudget",l:"Plumbing Job Budget",type:"number"}]:[]),
+    ...(co.elec?[{k:"elecJobBudget",l:"Electrical Job Budget",type:"number"}]:[]),
     {k:"hvacRoppsDailyBudget",l:"ROPPs Daily Budget",type:"number"},
     {k:"nonBudgetedDays",l:"Non Budgeted Days (YYYY-MM-DD, comma separated)",type:"text"},
   ];
@@ -361,29 +367,49 @@ function render(){
   // Sections
   var ccB=divd("HVAC")+mrow("HVAC Job Budget",hvacJBgt,"#",undefined,null)+mrow("HVAC Jobs on Board Today",g("hvacJobsOnBoard"),"#",hvacJBgt,"hvacJobsOnBoard")+mrow("HVAC Capacity",hvacJBgt>0?(g("hvacJobsOnBoard")/hvacJBgt*100):0,"%",undefined,null);
   if(co.plumb){ccB+=divd("Plumbing")+mrow("Plumbing Job Budget",plumbJBgt,"#",undefined,null)+mrow("Plumbing Jobs on Board",g("plumbJobsOnBoard"),"#",plumbJBgt,"plumbJobsOnBoard")+mrow("Plumbing Capacity",plumbJBgt>0?(g("plumbJobsOnBoard")/plumbJBgt*100):0,"%",undefined,null)}
+  if(co.elec){var elecJBgt=gb(act,"elecJobBudget");ccB+=divd("Electrical")+mrow("Electrical Job Budget",elecJBgt,"#",undefined,null)+mrow("Electrical Jobs on Board",g("elecJobsOnBoard"),"#",elecJBgt,"elecJobsOnBoard")+mrow("Electrical Capacity",elecJBgt>0?(g("elecJobsOnBoard")/elecJBgt*100):0,"%",undefined,null)}
   ccB+=divd("Phones")+mrow("Inbound Calls",g("callsInbound"),"#",undefined,"callsInbound")+mrow("Inbound Leads",g("inboundLeads"),"#",undefined,"inboundLeads")+mrow("Inbound Booking Rate",g("bookingRate"),"%",undefined,"bookingRate");
   ccB+=divd("ROPPs")+mrow("ROPP Budget",roppBgt,"#",undefined,null)+mrow("ROPPs on Board",g("hvacRoppsOnBoard"),"#",roppBgt,"hvacRoppsOnBoard");
 
-  var tB=mrow("ROPPs on Board",g("hvacRoppsOnBoard"),"#",roppBgt,"hvacRoppsOnBoard")+mrow("ROPPs Ran",g("hvacRoppsRan"),"#",undefined,"hvacRoppsRan")+mrow("TGLs Set",g("tglsSet"),"#",undefined,"tglsSet")+mrow("TGLs Set Same Day",g("tglsSetSameDay"),"#",undefined,"tglsSetSameDay")+mrow("TGLs Canceled",g("tglsCanceled"),"#",undefined,"tglsCanceled")+mrow("Flip Rate",flipRate,"%",undefined,null);
+  // Turnover-model companies (Brothers): the tgl* keys carry turnovers -
+  // sales-BU jobs created after a service/maintenance visit at the location.
+  var tglN=co.turnover?"Turnovers":"TGLs";
+  var tB=mrow("ROPPs on Board",g("hvacRoppsOnBoard"),"#",roppBgt,"hvacRoppsOnBoard")+mrow("ROPPs Ran",g("hvacRoppsRan"),"#",undefined,"hvacRoppsRan")+mrow(tglN+" Set",g("tglsSet"),"#",undefined,"tglsSet")+mrow(tglN+" Set Same Day",g("tglsSetSameDay"),"#",undefined,"tglsSetSameDay")+mrow(tglN+" Canceled",g("tglsCanceled"),"#",undefined,"tglsCanceled")+mrow("Flip Rate",flipRate,"%",undefined,null);
 
   var canB=mrow("HVAC Service & Maintenance",g("hvacSMCanceled"),"#",undefined,"hvacSMCanceled")+mrow("HVAC Sales",g("hvacSalesCanceled"),"#",undefined,"hvacSalesCanceled");
   if(co.plumb){canB+=mrow("Plumbing",g("plumbCanceled"),"#",undefined,"plumbCanceled")}
+  if(co.elec){canB+=mrow("Electrical",g("elecCanceled"),"#",undefined,"elecCanceled")}
+  if(co.excav){canB+=mrow("Excavation",g("excavCanceled"),"#",undefined,"excavCanceled")}
 
   var hB=mrow("Maintenance on Board",g("hvacMaintenanceOnBoard"),"#",undefined,"hvacMaintenanceOnBoard")+mrow("Maintenance Ran",g("hvacMaintenanceRan"),"#",undefined,"hvacMaintenanceRan")+mrow("Demand on Board",g("hvacDemandOnBoard"),"#",undefined,"hvacDemandOnBoard")+mrow("Demand Ran",g("hvacDemandRan"),"#",undefined,"hvacDemandRan")+mrow("Total Revenue",g("hvacServiceRevenue"),"$",undefined,"hvacServiceRevenue")+mrow("Total Sales",g("hvacServiceSales"),"$",undefined,"hvacServiceSales")+mrow("Average Ticket",hvacAvg,"$",undefined,null)+mrow("Memberships Sold",g("hvacMembershipsSold"),"#",undefined,"hvacMembershipsSold");
 
-  var sB=subh("TGL Sales",g("tglTotalSales"),c)+mrow("Total Sales",g("tglTotalSales"),"$",undefined,"tglTotalSales")+mrow("Leads Ran",g("tglLeadsRan"),"#",undefined,"tglLeadsRan")+mrow("Leads Sold",g("tglLeadsSold"),"#",undefined,"tglLeadsSold")+mrow("Conversion Rate",g("tglConversion"),"%",undefined,null)+mrow("Average Ticket",g("tglAvgTicket"),"$",undefined,null);
+  var sB=subh(co.turnover?"Service-Generated Sales":"TGL Sales",g("tglTotalSales"),c)+mrow("Total Sales",g("tglTotalSales"),"$",undefined,"tglTotalSales")+mrow("Leads Ran",g("tglLeadsRan"),"#",undefined,"tglLeadsRan")+mrow("Leads Sold",g("tglLeadsSold"),"#",undefined,"tglLeadsSold")+mrow("Conversion Rate",g("tglConversion"),"%",undefined,null)+mrow("Average Ticket",g("tglAvgTicket"),"$",undefined,null);
   sB+=subh("Marketing Sales",g("mktTotalSales"),c)+mrow("Total Sales",g("mktTotalSales"),"$",undefined,"mktTotalSales")+mrow("Leads Ran",g("mktLeadsRan"),"#",undefined,"mktLeadsRan")+mrow("Leads Sold",g("mktLeadsSold"),"#",undefined,"mktLeadsSold")+mrow("Conversion Rate",g("mktConversion"),"%",undefined,null)+mrow("Average Ticket",g("mktAvgTicket"),"$",undefined,null);
   if(co.costco){sB+=subh("Costco Sales",g("costcoTotalSales"),c)+mrow("Total Sales",g("costcoTotalSales"),"$",undefined,"costcoTotalSales")+mrow("Leads Ran",g("costcoLeadsRan"),"#",undefined,"costcoLeadsRan")+mrow("Leads Sold",g("costcoLeadsSold"),"#",undefined,"costcoLeadsSold")+mrow("Conversion Rate",g("costcoConversion"),"%",undefined,null)+mrow("Average Ticket",g("costcoAvgTicket"),"$",undefined,null)}
 
   var pB="";
-  // Sierra counts water-heater/filtration units by price-book code on estimates
-  // sold that day; Ultimate still counts completed install-type jobs.
-  var whL=act==="sierra"?"Sold":"Installed";
+  // Sierra & Brothers count water-heater/filtration units by price-book code on
+  // estimates sold that day; Ultimate still counts completed install-type jobs.
+  var whL=(act==="sierra"||act==="brothers")?"Sold":"Installed";
   if(co.plumb){pB=mrow("Maintenance on Board",g("plumbMaintenanceOnBoard"),"#",undefined,"plumbMaintenanceOnBoard")+mrow("Maintenance Ran",g("plumbMaintenanceRan"),"#",undefined,"plumbMaintenanceRan")+mrow("Demand on Board",g("plumbDemandOnBoard"),"#",undefined,"plumbDemandOnBoard")+mrow("Demand Ran",g("plumbDemandRan"),"#",undefined,"plumbDemandRan")+mrow("Total Revenue",g("plumbRevenue"),"$",undefined,"plumbRevenue")+mrow("Total Sales",g("plumbSales"),"$",undefined,"plumbSales")+mrow("Average Ticket",plumbAvg,"$",undefined,null)+mrow("Memberships Sold",g("plumbMembershipsSold"),"#",undefined,"plumbMembershipsSold")+mrow("Tankless "+whL,g("plumbTanklessSold"),"#",undefined,"plumbTanklessSold")+mrow("Filtration "+whL,g("plumbFiltrationSold"),"#",undefined,"plumbFiltrationSold")+mrow("Tanks "+whL,g("plumbTanksSold"),"#",undefined,"plumbTanksSold")}
+
+  // Electrical: mirrors the plumbing section (Brothers)
+  var eB="";
+  if(co.elec){
+    var elecRan=g("elecMaintenanceRan")+g("elecDemandRan");
+    var elecAvg=elecRan>0?g("elecRevenue")/elecRan:0;
+    eB=mrow("Maintenance on Board",g("elecMaintenanceOnBoard"),"#",undefined,"elecMaintenanceOnBoard")+mrow("Maintenance Ran",g("elecMaintenanceRan"),"#",undefined,"elecMaintenanceRan")+mrow("Demand on Board",g("elecDemandOnBoard"),"#",undefined,"elecDemandOnBoard")+mrow("Demand Ran",g("elecDemandRan"),"#",undefined,"elecDemandRan")+mrow("Total Revenue",g("elecRevenue"),"$",undefined,"elecRevenue")+mrow("Total Sales",g("elecSales"),"$",undefined,"elecSales")+mrow("Average Ticket",elecAvg,"$",undefined,null)+mrow("Memberships Sold",g("elecMembershipsSold"),"#",undefined,"elecMembershipsSold");
+  }
+  // Excavation: sales + install BUs as their own small section (Brothers)
+  var xB="";
+  if(co.excav){
+    xB=mrow("Jobs on Board",g("excavOnBoard"),"#",undefined,"excavOnBoard")+mrow("Jobs Ran",g("excavRan"),"#",undefined,"excavRan")+mrow("Total Revenue",g("excavRevenue"),"$",undefined,"excavRevenue")+mrow("Total Sales",g("excavSales"),"$",undefined,"excavSales");
+  }
 
   // Installs: real system installs by trade + today's-board callback list
   var instB=divd("HVAC")+mrow("Installs on Board",g("hvacInstallsOnBoard"),"#",undefined,"hvacInstallsOnBoard")+mrow("Installs Completed",g("hvacInstallsCompleted"),"#",undefined,"hvacInstallsCompleted")+mrow("Same-Day Installs (sold today)",g("hvacInstallsSameDay"),"#",undefined,"hvacInstallsSameDay");
   if(co.plumb){instB+=divd("Plumbing")+mrow("Installs on Board",g("plumbInstallsOnBoard"),"#",undefined,"plumbInstallsOnBoard")+mrow("Installs Completed",g("plumbInstallsCompleted"),"#",undefined,"plumbInstallsCompleted")+mrow("Same-Day Installs (sold today)",g("plumbInstallsSameDay"),"#",undefined,"plumbInstallsSameDay")}
+  if(co.elec){instB+=divd("Electrical")+mrow("Installs on Board",g("elecInstallsOnBoard"),"#",undefined,"elecInstallsOnBoard")+mrow("Installs Completed",g("elecInstallsCompleted"),"#",undefined,"elecInstallsCompleted")+mrow("Same-Day Installs (sold today)",g("elecInstallsSameDay"),"#",undefined,"elecInstallsSameDay")}
   var cbData=sd[act]||{},cbList=cbData.installCallbacksToday||[],cbAlerts=cbData.installCallbackAlerts||0;
   function fmtDay(s){if(!s)return"?";var p=s.split("-");return(+p[1])+"/"+(+p[2])}
   var cbB="";
@@ -437,9 +463,11 @@ function render(){
     (monthlyPlan>0?hero("Adjusted Daily Plan",adjPlan,"$",null,bdLeft>0?bdLeft+" budgeted days left (incl. today)":"Month complete",false):hero("Adjusted Daily Plan",0,"$",null,"Set Monthly Plan in budgets",false))+
     '</div><div class="two-col"><div>'+
     sec("Call Center","📞",c,co.lg,null,sparkHdr+ccB)+
-    sec("TGL","🔄",c,co.lg,flipRate.toFixed(1)+"% Flip",tB)+
+    sec(co.turnover?"Turnovers":"TGL","🔄",c,co.lg,flipRate.toFixed(1)+"% Flip",tB)+
     sec("Canceled Calls","🚫",c,co.lg,totalCanceled+" total",canB)+
     (co.plumb?sec("Plumbing","🔧",c,co.lg,g("plumbRevenue")>0?"$"+g("plumbRevenue").toLocaleString():null,pB):"")+
+    (co.elec?sec("Electrical","⚡",c,co.lg,g("elecRevenue")>0?"$"+g("elecRevenue").toLocaleString():null,eB):"")+
+    (co.excav?sec("Excavation","🚜",c,co.lg,g("excavRevenue")>0?"$"+g("excavRevenue").toLocaleString():null,xB):"")+
     '</div><div>'+
     sec("HVAC Service & Maintenance","❄️",c,co.lg,g("hvacServiceRevenue")>0?"$"+g("hvacServiceRevenue").toLocaleString():null,hB)+
     sec("HVAC Sales","📊",c,co.lg,totalHS>0?"$"+totalHS.toLocaleString():null,sB)+

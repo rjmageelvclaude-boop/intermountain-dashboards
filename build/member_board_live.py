@@ -78,6 +78,8 @@ COMPANIES = {
     "sierra":   {"tenant": "SIE", "tz": "pacific",  "label": "Sierra",   "color": "#1663c7"},
     "ultimate": {"tenant": "ULT", "tz": "mountain", "label": "Ultimate", "color": "#c7161d"},
     "russett":  {"tenant": "RUS", "tz": "arizona",  "label": "Russett",  "color": "#0e7a3d"},
+    # One membership type ("Home Care Club"), no warranty types to exclude.
+    "brothers": {"tenant": "BRO", "tz": "mountain", "label": "Brothers", "color": "#c2410c"},
 }
 
 # Extended labor warranties live in ST as membership types but are not

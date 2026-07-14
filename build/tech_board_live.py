@@ -103,6 +103,11 @@ def _is_memb_sku(company, name):
             w in n for w in ("cancel", "mthly", "billing", "credit", "deferred", "adj"))
     if company == "russett":
         return n.startswith("mvp") and "discount" not in n
+    if company == "brothers":
+        # Home Care Club: HCC* task codes (HCCAC, HCCPL, HCCWAIVED67, "HCC New
+        # Monthly Membership", the "Join the Club!" advertisement task) plus the
+        # membership-named add-ons. Discount lines aren't an offer/sale marker.
+        return (n.startswith("hcc") or "monthly membership" in n) and "discount" not in n
     return False
 
 

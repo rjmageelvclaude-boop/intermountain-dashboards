@@ -104,12 +104,55 @@ COMPANIES = {
         "ropp_tags": [63640008],
         "plumb": False, "costco": False,
     },
+    "brothers": {
+        "tenant": "BRO",
+        "tz": "mountain",  # Denver
+        "bu": {
+            2218904: "hvac_demand", 14821223: "hvac_maint",
+            2218900: "hvac_sales", 2218902: "hvac_install",
+            # Drain Cleaning rides with plumbing service (RJ 2026-07-13)
+            2218910: "plumb_demand", 19583412: "plumb_demand",
+            14821351: "plumb_maint", 2218906: "plumb_sales",
+            2218908: "plumb_install",
+            2218916: "elec_demand", 14821224: "elec_maint",
+            2218918: "elec_sales", 2218917: "elec_install",
+            548686598: "excav_sales", 2218912: "excav_install",
+            # unmapped on purpose: 2218915 Administrative, 2218920 Agreement
+            # Visits (no job traffic as of 2026-07)
+        },
+        "costco_bu": [],
+        # "Replacement Opportunity" - Brothers' ROPP equivalent (no ROPP tag)
+        "ropp_tags": [85],
+        # No comfort-advisor model: nobody sets jobGeneratedLeadSource, so the
+        # TGL machinery runs on turnovers instead - a Sales-BU job counts as
+        # service-generated when the location had a service/maintenance visit
+        # in the prior SVCGEN_LOOKBACK_DAYS (trace 2026-07-13: HVAC sales jobs
+        # split ~20% service-generated / ~80% marketed; excavation is ~85%
+        # turnover from Drain Cleaning, gap almost always 0-3 days).
+        "svcgen_sales": True,
+        # Water-heater/filtration/tank units by price-book code PREFIX on
+        # estimates sold that day (Brothers' codes are per-model, so patterns
+        # instead of Sierra-style exact lists).
+        "wh_sku_patterns": {
+            "tankless": re.compile(r"^(RIN-R[EX]P?199I|NAV-NPE|E55RD|WI-(69|70)\b)", re.I),
+            "filtration": re.compile(r"^(HWF-|HALO-|ION-\d|SCALE-RX|WAT-7100103|WAT-PWRO4ZRO|DEL-?\s?DWQ)", re.I),
+            "tanks": re.compile(r"^(STA-(GS|GP|EN|EE|ES|HPX|CSB|PCE)|URG2PV|RG250T6N|STATE WARRANTY TANK|WHI-[12]$)", re.I),
+        },
+        "plumb": True, "costco": False, "elec": True, "excav": True,
+    },
 }
 
 HVAC_SERVICE = ("hvac_demand", "hvac_maint")
 PLUMB_SERVICE = ("plumb_demand", "plumb_maint")
-PLUMB_ALL = ("plumb_demand", "plumb_maint", "plumb_install")
-INSTALL_BUCKETS = ("hvac_install", "plumb_install")
+PLUMB_ALL = ("plumb_demand", "plumb_maint", "plumb_install", "plumb_sales")
+ELEC_SERVICE = ("elec_demand", "elec_maint")
+ELEC_ALL = ("elec_demand", "elec_maint", "elec_install", "elec_sales")
+EXCAV_ALL = ("excav_sales", "excav_install")
+INSTALL_BUCKETS = ("hvac_install", "plumb_install", "elec_install")
+# service/maintenance visits that can generate a turnover (any trade - a drain
+# tech turning over an excavation job counts)
+SVCGEN_SOURCE = HVAC_SERVICE + PLUMB_SERVICE + ELEC_SERVICE
+SVCGEN_LOOKBACK_DAYS = 30
 
 # Install callbacks: any return job at the install's location that is NOT an
 # expected follow-up (drywall patch, QA walk, permit inspection, finish/startup
@@ -134,8 +177,9 @@ def _is_install_anchor(bucket, jt_name):
     mapped operating BU, not just the install BUs. Russett/Ultimate run install
     callbacks with service techs, and Sierra/Ultimate plumbing installs (water
     heaters, toilets, disposals) can be booked through the service departments
-    (RJ 2026-07-12) - so installs anchored anywhere except HVAC Sales count."""
-    return (bucket is not None and bucket != "hvac_sales"
+    (RJ 2026-07-12) - so installs anchored anywhere except a sales BU count
+    (Brothers has plumbing/electrical/excavation sales BUs too)."""
+    return (bucket is not None and not bucket.endswith("_sales")
             and "install" in jt_name.lower()
             and not re.search(r"\bpart\b", jt_name, re.I))
 
@@ -278,14 +322,49 @@ def membership_type_names(tenant):
 def _in_window(ts, start, end):
     return ts is not None and start <= ts < end
 
-def _sales_category(co, job):
-    """tgl / costco / mkt for an HVAC-Sales job."""
+def _sales_category(co, job, svcgen_ids=None):
+    """tgl / costco / mkt for an HVAC-Sales job.
+
+    Turnover-model companies (Brothers) have no TGL job types or lead sources;
+    there the tgl slot holds SERVICE-GENERATED sales (job follows a recent
+    service/maintenance visit at the same location) and everything else is mkt.
+    Reusing the tgl key keeps the sparkline history and frontend machinery
+    intact - the page just relabels the rows."""
+    if co.get("svcgen_sales"):
+        return "tgl" if job["id"] in (svcgen_ids or ()) else "mkt"
     name = job["_jt_name"].lower()
     if "tgl" in name:
         return "tgl"
     if job.get("businessUnitId") in co["costco_bu"] or "costco" in name:
         return "costco"
     return "mkt"
+
+
+def _svcgen_ids(tenant, bu_map, sales_jobs, day, tz):
+    """Ids of sales-BU jobs whose location saw a (non-canceled) service or
+    maintenance job created in the SVCGEN_LOOKBACK_DAYS before the sales job
+    was created - Brothers' turnover definition (no CA model, no lead sources).
+    One location-batched pull; cheap at one company/day granularity."""
+    locs = sorted({j["locationId"] for j in sales_jobs if j.get("locationId")})
+    if not locs:
+        return set()
+    start, _ = local_day_window_utc(tz, day - dt.timedelta(days=SVCGEN_LOOKBACK_DAYS))
+    _, end = local_day_window_utc(tz, day)
+    prior = {}
+    for i in range(0, len(locs), 50):
+        for p in fetch_all(tenant, "/jpm/v2/tenant/{tenant}/jobs",
+                           {"locationIds": ",".join(map(str, locs[i:i + 50])),
+                            "createdOnOrAfter": start, "createdBefore": end},
+                           page_size=500):
+            if (bu_map.get(p.get("businessUnitId")) in SVCGEN_SOURCE
+                    and p.get("jobStatus") != "Canceled"):
+                prior.setdefault(p["locationId"], []).append(p.get("createdOn") or "")
+    out = set()
+    for j in sales_jobs:
+        cutoff = j.get("createdOn") or ""
+        if any(ts < cutoff for ts in prior.get(j.get("locationId"), ())):
+            out.add(j["id"])
+    return out
 
 def _wh_category(name):
     n = name.lower()
@@ -344,34 +423,65 @@ def compute_day(company, day, jt_names=None):
     m["plumbMaintenanceRan"] = count(lambda j: j["_bucket"] == "plumb_maint" and ran(j))
     m["plumbDemandRan"] = count(lambda j: j["_bucket"] == "plumb_demand" and ran(j))
 
+    # Electrical + Excavation trades (Brothers). Zero everywhere else - the
+    # frontend only renders these sections when the company flags them on.
+    m["elecMaintenanceOnBoard"] = count(lambda j: j["_bucket"] == "elec_maint" and live(j))
+    m["elecDemandOnBoard"] = count(lambda j: j["_bucket"] == "elec_demand" and live(j))
+    m["elecJobsOnBoard"] = m["elecMaintenanceOnBoard"] + m["elecDemandOnBoard"]
+    m["elecMaintenanceRan"] = count(lambda j: j["_bucket"] == "elec_maint" and ran(j))
+    m["elecDemandRan"] = count(lambda j: j["_bucket"] == "elec_demand" and ran(j))
+    m["excavOnBoard"] = count(lambda j: j["_bucket"] in EXCAV_ALL and live(j))
+    m["excavRan"] = count(lambda j: j["_bucket"] in EXCAV_ALL and ran(j))
+
     # -- real system installs on today's board, split by trade
     inst = lambda j, t: j["_bucket"] == t and _is_system_install(t, j["_jt_name"])
     m["hvacInstallsOnBoard"] = count(lambda j: live(j) and inst(j, "hvac_install"))
     m["hvacInstallsCompleted"] = count(lambda j: ran(j) and inst(j, "hvac_install"))
     m["plumbInstallsOnBoard"] = count(lambda j: live(j) and inst(j, "plumb_install"))
     m["plumbInstallsCompleted"] = count(lambda j: ran(j) and inst(j, "plumb_install"))
+    m["elecInstallsOnBoard"] = count(lambda j: live(j) and inst(j, "elec_install"))
+    m["elecInstallsCompleted"] = count(lambda j: ran(j) and inst(j, "elec_install"))
 
     m["hvacSMCanceled"] = count(lambda j: j["_bucket"] in HVAC_SERVICE and j.get("jobStatus") == "Canceled")
     m["hvacSalesCanceled"] = count(lambda j: j["_bucket"] == "hvac_sales" and j.get("jobStatus") == "Canceled")
     m["plumbCanceled"] = count(lambda j: (j["_bucket"] or "").startswith("plumb") and j.get("jobStatus") == "Canceled")
+    m["elecCanceled"] = count(lambda j: (j["_bucket"] or "").startswith("elec") and j.get("jobStatus") == "Canceled")
+    m["excavCanceled"] = count(lambda j: j["_bucket"] in EXCAV_ALL and j.get("jobStatus") == "Canceled")
+
+    # -- jobs created today (feeds TGLs/turnovers and same-day installs)
+    created = [decorate(j) for j in fetch_all(
+        tenant, "/jpm/v2/tenant/{tenant}/jobs",
+        {"createdOnOrAfter": start, "createdBefore": end}, page_size=500)]
+
+    # Turnover-model companies: which sales-BU jobs follow a recent service
+    # visit at the same location (one location-batched lookback pull).
+    svcgen_ids = svcgen_checked = None
+    if co.get("svcgen_sales"):
+        seen_sales = {j["id"]: j for j in board + created if j["_bucket"] == "hvac_sales"}
+        svcgen_ids = _svcgen_ids(tenant, bu, seen_sales.values(), day, co["tz"])
+        svcgen_checked = set(seen_sales)
 
     # sales-lead board: leads ran today by category
     leads_ran = {"tgl": 0, "costco": 0, "mkt": 0}
     for j in board:
         if j["_bucket"] == "hvac_sales" and ran(j):
-            leads_ran[_sales_category(co, j)] += 1
+            leads_ran[_sales_category(co, j, svcgen_ids)] += 1
 
     # -- TGLs set today: HVAC Sales jobs created today with a technician on the
     # Lead Generated By field. Matching on job-type name misses leads booked
     # with a plain type (e.g. "Estimate AC"), and ServiceTitan's TGL reports
     # key off Lead Generated By. Canceled jobs still count as set - the tech
     # earned the lead - and are surfaced separately for awareness.
-    created = [decorate(j) for j in fetch_all(
-        tenant, "/jpm/v2/tenant/{tenant}/jobs",
-        {"createdOnOrAfter": start, "createdBefore": end}, page_size=500)]
-    tgl_created = [j for j in created
-                   if j["_bucket"] == "hvac_sales"
-                   and (j.get("jobGeneratedLeadSource") or {}).get("employeeId")]
+    # Turnover-model companies (Brothers) count a sales-BU job created today
+    # that follows a service/maintenance visit at the location instead - nobody
+    # there sets Lead Generated By (verified ~1-2 jobs/month, 2026-07-13).
+    if co.get("svcgen_sales"):
+        tgl_created = [j for j in created
+                       if j["_bucket"] == "hvac_sales" and j["id"] in svcgen_ids]
+    else:
+        tgl_created = [j for j in created
+                       if j["_bucket"] == "hvac_sales"
+                       and (j.get("jobGeneratedLeadSource") or {}).get("employeeId")]
     m["tglsSet"] = len(tgl_created)
     m["tglsSetSameDay"] = sum(1 for j in tgl_created if j["id"] in jobs_by_id)
     m["tglsCanceled"] = sum(1 for j in tgl_created if j.get("jobStatus") == "Canceled")
@@ -384,6 +494,8 @@ def compute_day(company, day, jt_names=None):
         lambda j: live(j) and inst(j, "hvac_install") and j["id"] in created_ids)
     m["plumbInstallsSameDay"] = count(
         lambda j: live(j) and inst(j, "plumb_install") and j["id"] in created_ids)
+    m["elecInstallsSameDay"] = count(
+        lambda j: live(j) and inst(j, "elec_install") and j["id"] in created_ids)
 
     # -- estimates sold today
     estimates = fetch_all(tenant, "/sales/v2/tenant/{tenant}/estimates",
@@ -394,7 +506,14 @@ def compute_day(company, day, jt_names=None):
                            {"ids": ",".join(map(str, missing[i:i + 50]))}):
             jobs_by_id[j["id"]] = decorate(j)
 
-    daily_sales = hvac_service_sales = plumb_sales = 0.0
+    # an estimate can be sold today on an older sales job that never touched
+    # today's board - classify those turnover-or-marketed too
+    if svcgen_ids is not None:
+        extra = [j for j in jobs_by_id.values()
+                 if j["_bucket"] == "hvac_sales" and j["id"] not in svcgen_checked]
+        svcgen_ids |= _svcgen_ids(tenant, bu, extra, day, co["tz"])
+
+    daily_sales = hvac_service_sales = plumb_sales = elec_sales = excav_sales = 0.0
     cat_sales = {"tgl": 0.0, "costco": 0.0, "mkt": 0.0}
     cat_sold_jobs = {"tgl": set(), "costco": set(), "mkt": set()}
     for e in estimates:
@@ -406,8 +525,12 @@ def compute_day(company, day, jt_names=None):
             hvac_service_sales += amt
         elif bucket in PLUMB_ALL:
             plumb_sales += amt
+        elif bucket in ELEC_ALL:
+            elec_sales += amt
+        elif bucket in EXCAV_ALL:
+            excav_sales += amt
         elif bucket == "hvac_sales":
-            cat = _sales_category(co, job)
+            cat = _sales_category(co, job, svcgen_ids)
             cat_sales[cat] += amt
             cat_sold_jobs[cat].add(job["id"])
 
@@ -415,6 +538,7 @@ def compute_day(company, day, jt_names=None):
     # where configured (Sierra); otherwise completed install-type jobs.
     wh = {"tankless": 0.0, "filtration": 0.0, "tanks": 0.0}
     wh_skus = co.get("wh_skus")
+    wh_patterns = co.get("wh_sku_patterns")
     if wh_skus:
         sku_cat = {code: c for c, codes in wh_skus.items() for code in codes}
         for e in estimates:
@@ -422,6 +546,14 @@ def compute_day(company, day, jt_names=None):
                 c = sku_cat.get(((it.get("sku") or {}).get("name") or "").strip())
                 if c:
                     wh[c] += float(it.get("qty") or 1)
+    elif wh_patterns:
+        for e in estimates:
+            for it in (e.get("items") or []):
+                name = ((it.get("sku") or {}).get("name") or "").strip()
+                for c, rx in wh_patterns.items():
+                    if rx.match(name):
+                        wh[c] += float(it.get("qty") or 1)
+                        break
     else:
         for j in board:
             if ran(j):
@@ -435,6 +567,8 @@ def compute_day(company, day, jt_names=None):
     m["dailySales"] = round(daily_sales, 2)
     m["hvacServiceSales"] = round(hvac_service_sales, 2)
     m["plumbSales"] = round(plumb_sales, 2)
+    m["elecSales"] = round(elec_sales, 2)
+    m["excavSales"] = round(excav_sales, 2)
     for cat, label in (("tgl", "tgl"), ("mkt", "mkt"), ("costco", "costco")):
         total, ran_n, sold_n = cat_sales[cat], leads_ran[cat], len(cat_sold_jobs[cat])
         prefix = label
@@ -449,8 +583,8 @@ def compute_day(company, day, jt_names=None):
     day_e = (day + dt.timedelta(days=1)).strftime("%Y-%m-%dT00:00:00Z")
     invoices = fetch_all(tenant, "/accounting/v2/tenant/{tenant}/invoices",
                          {"invoicedOnOrAfter": day_s, "invoicedOnBefore": day_e}, page_size=500)
-    daily_rev = hvac_service_rev = plumb_rev = 0.0
-    memb = {"hvac": 0, "plumb": 0}
+    daily_rev = hvac_service_rev = plumb_rev = elec_rev = excav_rev = 0.0
+    memb = {"hvac": 0, "plumb": 0, "elec": 0}
     for inv in invoices:
         sub = float(inv.get("subTotal") or 0)
         daily_rev += sub
@@ -459,16 +593,25 @@ def compute_day(company, day, jt_names=None):
             hvac_service_rev += sub
         elif bucket in PLUMB_ALL:
             plumb_rev += sub
+        elif bucket in ELEC_ALL:
+            elec_rev += sub
+        elif bucket in EXCAV_ALL:
+            excav_rev += sub
         # memberships sold: distinct invoices carrying a membership line item
         # (multi-system memberships bill one item per system - count the sale once)
         if any((it.get("membershipTypeId") or 0) or it.get("type") == "Membership"
                for it in (inv.get("items") or [])):
-            memb["plumb" if (bucket or "").startswith("plumb") else "hvac"] += 1
+            pre = (bucket or "")
+            memb["plumb" if pre.startswith("plumb")
+                  else "elec" if pre.startswith(("elec", "excav")) else "hvac"] += 1
     m["dailyRevenue"] = round(daily_rev, 2)
     m["hvacServiceRevenue"] = round(hvac_service_rev, 2)
     m["plumbRevenue"] = round(plumb_rev, 2)
+    m["elecRevenue"] = round(elec_rev, 2)
+    m["excavRevenue"] = round(excav_rev, 2)
     m["hvacMembershipsSold"] = memb["hvac"]
     m["plumbMembershipsSold"] = memb["plumb"]
+    m["elecMembershipsSold"] = memb["elec"]
 
     # -- phones
     calls = fetch_all(tenant, "/telecom/v2/tenant/{tenant}/calls",
@@ -574,7 +717,8 @@ def compute_install_callbacks(company):
                 and (j.get("createdOn") or "") > (install.get("completedOn") or "")
                 and not _is_install_anchor(bucket(j), name)  # a new purchase isn't a callback
                 # sales-BU estimate visits don't count, but a recall booked there does
-                and (bucket(j) != "hvac_sales" or re.search(r"recall|warranty", name, re.I))
+                and (not (bucket(j) or "").endswith("_sales")
+                     or re.search(r"recall|warranty", name, re.I))
                 and not _CALLBACK_EXEMPT.search(name))
 
     # Every return trip was created after its install completed, and installs
