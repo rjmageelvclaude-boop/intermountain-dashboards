@@ -347,7 +347,7 @@ function subbar(withDays){
 }
 function shell(inner,foot,withDays){
   return'<div class="board">'+topbar()+subbar(withDays)+'<div class="body">'+inner+'</div>'+
-    '<div class="footer"><span>'+foot+'</span><span>Sales revenue matches the CA Leaderboard to the dollar &middot; leads here count every completed run, so close rate can differ a touch from the CA board\'s opportunity rule</span></div></div>'+
+    '<div class="footer"><span>'+foot+'</span><span>Sales = active Sold estimate subtotals (matches the CA Leaderboard to the dollar) &middot; leads here count every completed run, so close rate can differ a touch from the CA board\'s opportunity rule</span></div></div>'+
     (feedError?'<div class="feed-err">'+feedError+'</div>':'');
 }
 function typeCols(){return TYPES.filter(function(t){return t[0]!=="costco"||B().hasCostco})}
@@ -364,7 +364,7 @@ function renderScore(){
   var toPlan=plan("toRate");
 
   var cards='<div class="cards">'+
-    '<div class="card"><div class="c-label">MTD Revenue</div><div class="c-val">'+fmt$(rev)+'</div>'+
+    '<div class="card"><div class="c-label">MTD Sales</div><div class="c-val">'+fmt$(rev)+'</div>'+
       (p.revenue!==null?
         '<div class="capbar"><i style="width:'+Math.min(rev/p.revenue*100,100).toFixed(0)+'%"></i></div>'+
         '<div class="c-sub">'+pct(rev,p.revenue)+' of '+fmt$(p.revenue)+' plan'+(toDate!==null?' '+chip(rev-toDate,fmt$):'')+'</div>'
@@ -403,8 +403,8 @@ function renderScore(){
     '<td>'+(p.revenue!==null?chip(t.revenue-p.revenue,fmt$):'<span class="dash">&mdash;</span>')+'</td></tr>';
 
   var tbl='<div class="sect">Monthly Actuals vs Plan</div><div class="tbl-scroll"><table class="g"><thead><tr>'+
-    '<th>Lead Type</th><th>Leads</th><th>Sold</th><th>Close</th><th>Avg Sale</th><th>Revenue</th>'+
-    '<th class="grp">Plan Leads</th><th>Plan Close</th><th>Plan Avg</th><th>Plan Revenue</th><th>Rev Var</th>'+
+    '<th>Lead Type</th><th>Leads</th><th>Sold</th><th>Close</th><th>Avg Sale</th><th>Sales</th>'+
+    '<th class="grp">Plan Leads</th><th>Plan Close</th><th>Plan Avg</th><th>Plan Sales</th><th>Sales Var</th>'+
     '</tr></thead><tbody>'+rows+'</tbody></table></div>';
 
   // recent days with day-over-day arrows and revenue bars
@@ -428,12 +428,12 @@ function renderScore(){
   }).join("");
   var daily='<div class="sect">Recent Days <span style="letter-spacing:0;text-transform:none;font-weight:600">&middot; arrows vs the prior day</span></div>'+
     '<div class="tbl-scroll"><table class="g"><thead><tr>'+
-    '<th>Day</th><th>Leads Ran</th><th>Sold</th><th>Close</th><th>Revenue Sold</th><th>Turns Created</th></tr></thead><tbody>'+drows+'</tbody></table></div>';
+    '<th>Day</th><th>Leads Ran</th><th>Sold</th><th>Close</th><th>Sales</th><th>Turns Created</th></tr></thead><tbody>'+drows+'</tbody></table></div>';
 
   // top-5 snapshots
   var topAdv=b.advisors.slice(0,5),maxA=topAdv.length?Math.max(topAdv[0].total.revenue,1):1;
-  var advTbl='<div><div class="sect">Top Advisors &middot; MTD Revenue</div><div class="tbl-scroll"><table class="g"><thead><tr>'+
-    '<th>Advisor</th><th>Revenue</th><th>Sold / Leads</th><th>Close</th></tr></thead><tbody>'+
+  var advTbl='<div><div class="sect">Top Advisors &middot; MTD Sales</div><div class="tbl-scroll"><table class="g"><thead><tr>'+
+    '<th>Advisor</th><th>Sales</th><th>Sold / Leads</th><th>Close</th></tr></thead><tbody>'+
     topAdv.map(function(a,i){
       return'<tr><td><span class="rankn">'+(i+1)+'</span> '+a.name+'</td>'+
         '<td>'+fmt$(a.total.revenue)+'<span class="rbar"><i style="width:'+(a.total.revenue/maxA*100).toFixed(0)+'%"></i></span></td>'+
@@ -441,7 +441,7 @@ function renderScore(){
     }).join("")+'</tbody></table></div></div>';
   var topTech=b.techs.slice(0,5),maxT=topTech.length?Math.max(topTech[0].codRev+topTech[0].maintRev,1):1;
   var techTbl='<div><div class="sect">Top Turnover Techs &middot; MTD</div><div class="tbl-scroll"><table class="g"><thead><tr>'+
-    '<th>Technician</th><th>Turn Revenue</th><th>Turns / ROPPs</th><th>TO Rate</th></tr></thead><tbody>'+
+    '<th>Technician</th><th>Turn Sales</th><th>Turns / ROPPs</th><th>TO Rate</th></tr></thead><tbody>'+
     topTech.map(function(r,i){
       var rv=r.codRev+r.maintRev;
       return'<tr><td><span class="rankn">'+(i+1)+'</span> '+r.name+'</td>'+
@@ -502,12 +502,12 @@ function battingSection(rows){
       '<td>'+(tot.leads?fmt$(tot.rev/tot.leads):"&mdash;")+'</td></tr>';
     var empty='<tr><td colspan="9" style="text-align:center;color:var(--faint)">No activity</td></tr>';
     return'<div><div class="sect tt-'+c[2]+'">'+c[1]+'</div><div class="tbl-scroll"><table class="g"><thead><tr>'+
-      '<th>#</th><th>Comfort Advisor</th><th>Ran</th><th>Sold</th><th>Conv.</th><th>Revenue</th><th>Avg Sale</th><th>Gained / Lost Rev</th><th>$/Lead Ran</th>'+
+      '<th>#</th><th>Comfort Advisor</th><th>Ran</th><th>Sold</th><th>Conv.</th><th>Sales</th><th>Avg Sale</th><th>Gained / Lost Sales</th><th>$/Lead Ran</th>'+
       '</tr></thead><tbody>'+(list.length?body+trow:empty)+'</tbody></table></div></div>';
   }).join("");
   var defs='<div class="defs">'+
-    '<div><b>$/Lead Ran</b> &mdash; revenue sold &divide; leads ran: the average dollars an advisor produces every time they run a lead in that category. This is what the batting order is ranked by.</div>'+
-    '<div><b>Gained or Lost Revenue</b> &mdash; revenue sold &minus; (leads ran &times; planned close % &times; planned avg ticket): dollars above (green) or below (red) what the monthly plan expects from that many leads. The planned close % and avg ticket come from the Monthly Setup tab.</div>'+
+    '<div><b>$/Lead Ran</b> &mdash; sales sold &divide; leads ran: the average dollars an advisor produces every time they run a lead in that category. This is what the batting order is ranked by.</div>'+
+    '<div><b>Gained or Lost Sales</b> &mdash; sales sold &minus; (leads ran &times; planned close % &times; planned avg ticket): dollars above (green) or below (red) what the monthly plan expects from that many leads. The planned close % and avg ticket come from the Monthly Setup tab.</div>'+
   '</div>';
   return'<div class="sect">Batting Order &middot; ranked by $ per lead ran</div><div class="batgrid">'+boards+'</div>'+defs;
 }
@@ -518,8 +518,8 @@ function renderAdvisors(){
   var cols=typeCols(),mtd=day==="mtd";
   var h1='<tr><th rowspan="2" style="vertical-align:bottom">Advisor</th><th colspan="6" class="grp">Totals</th>'+
     cols.map(function(t){return'<th colspan="5" class="grp tt-'+t[2]+'">'+t[1]+'</th>'}).join("")+'</tr>';
-  var h2='<tr><th class="grp">Leads</th><th>Sold</th><th>Close</th><th>Revenue</th><th>Avg Sale</th><th>$/Lead</th>'+
-    cols.map(function(){return'<th class="grp">Leads</th><th>Sold</th><th>Close</th><th>Avg Sale</th><th>Revenue</th>'}).join("")+'</tr>';
+  var h2='<tr><th class="grp">Leads</th><th>Sold</th><th>Close</th><th>Sales</th><th>Avg Sale</th><th>$/Lead</th>'+
+    cols.map(function(){return'<th class="grp">Leads</th><th>Sold</th><th>Close</th><th>Avg Sale</th><th>Sales</th>'}).join("")+'</tr>';
   var body=rows.map(function(a,i){
     var t=a.total;
     var tr='<tr><td><span class="rankn">'+(i+1)+'</span> '+a.name+'</td>'+
@@ -547,7 +547,7 @@ function renderAdvisors(){
   var empty='<div style="text-align:center;padding:40px;color:var(--faint);font-weight:600">No advisor activity for this day.</div>';
   var inner=rows.length?'<div class="tbl-scroll"><table class="g"><thead>'+h1+h2+'</thead><tbody>'+body+trow+'</tbody></table></div>'+battingSection(rows):empty;
   document.getElementById("app").innerHTML=shell(inner,
-    "Leads = completed sales-BU runs, day of run &middot; sold + revenue = the CA's sold estimates, day sold",true);
+    "Leads = completed sales-BU runs, day of run &middot; sold + sales = the CA's sold estimates, day sold",true);
 }
 
 // ── turnovers ──
@@ -561,7 +561,7 @@ function renderTurnovers(){
     '<th colspan="3" class="grp">Sales from Turns</th></tr>';
   var h2='<tr><th class="grp">COD</th><th>Maint</th><th>Total</th>'+
     '<th class="grp">COD</th><th>Maint</th><th>Total</th>'+
-    '<th class="grp">COD</th><th>Maint</th><th class="grp"># Sold</th><th>Revenue</th><th>$/Opp</th></tr>';
+    '<th class="grp">COD</th><th>Maint</th><th class="grp"># Sold</th><th>Sales</th><th>$/Opp</th></tr>';
   var sums=dict0();
   function dict0(){var o={};T_FIELDS.forEach(function(f){o[f]=0});o.opps=0;o.turns=0;return o}
   var body=rows.map(function(r,i){
@@ -586,7 +586,7 @@ function renderTurnovers(){
   var empty='<div style="text-align:center;padding:40px;color:var(--faint);font-weight:600">No technician activity for this day.</div>';
   var inner=rows.length?'<div class="tbl-scroll"><table class="g"><thead>'+h1+h2+'</thead><tbody>'+body+trow+'</tbody></table></div>':empty;
   document.getElementById("app").innerHTML=shell(inner,
-    "Opps = completed opportunity jobs in the HVAC demand/maintenance BUs &middot; ROPPs = ROPP-tagged completed jobs (net of Management Removed) &middot; TO Rate = turns &divide; ROPPs ran &middot; turns = sales jobs the tech generated (canceled excluded) &middot; sales credit the generating tech &middot; $/Opp = turn revenue &divide; opportunities ran",true);
+    "Opps = completed opportunity jobs in the HVAC demand/maintenance BUs &middot; ROPPs = ROPP-tagged completed jobs (net of Management Removed) &middot; TO Rate = turns &divide; ROPPs ran &middot; turns = sales jobs the tech generated (canceled excluded) &middot; sales credit the generating tech &middot; $/Opp = turn sales &divide; opportunities ran",true);
 }
 
 // ── setup ──
@@ -608,7 +608,7 @@ function renderSetup(){
   aRows+='<tr class="tot"><td>Total</td><td>'+mt.leads+'</td><td>'+mt.sold+'</td><td>'+pct(mt.sold,mt.leads)+'</td>'+
     '<td>'+(mt.sold?fmt$(mt.revenue/mt.sold):"&mdash;")+'</td><td>'+fmt$(mt.revenue)+'</td></tr>';
   var actualTbl='<div><div class="sect">Actual MTD &middot; Leads &amp; Sales Results</div><div class="tbl-scroll"><table class="g"><thead><tr>'+
-    '<th>Lead Type</th><th>Leads</th><th>Sales</th><th>Close %</th><th>Avg. Sale</th><th>Revenue</th></tr></thead><tbody>'+aRows+'</tbody></table></div></div>';
+    '<th>Lead Type</th><th>Leads</th><th>Sold</th><th>Close %</th><th>Avg. Sale</th><th>Sales</th></tr></thead><tbody>'+aRows+'</tbody></table></div></div>';
 
   // Expectations MTD table: the plan prorated to workdays elapsed
   var eRows="",teLeads=0,teSales=0,teRev=0,teRevVar=0,teSalesVar=0;
@@ -632,7 +632,7 @@ function renderSetup(){
     '<td style="color:var(--'+(teRevVar>=0?'good':'bad')+')">'+fmtPar(teRevVar)+'</td>'+
     '<td style="color:var(--'+(teSalesVar>=0?'good':'bad')+')">'+(teSalesVar<0?"("+Math.abs(Math.round(teSalesVar*10)/10)+")":Math.round(teSalesVar*10)/10)+'</td></tr>';
   var expTbl='<div><div class="sect">Expectations MTD &middot; Leads &amp; Sales Results</div><div class="tbl-scroll"><table class="g"><thead><tr>'+
-    '<th>Lead Type</th><th>Leads</th><th>Close %</th><th>Avg. Sale</th><th>Sales</th><th>Revenue</th><th>Rev. Var.</th><th>Sales Var.</th></tr></thead><tbody>'+eRows+'</tbody></table></div></div>';
+    '<th>Lead Type</th><th>Leads</th><th>Close %</th><th>Avg. Sale</th><th>Sold</th><th>Sales</th><th>Sales Var.</th><th>Sold Var.</th></tr></thead><tbody>'+eRows+'</tbody></table></div></div>';
 
   function row(f,l){
     var v=plan(f);
