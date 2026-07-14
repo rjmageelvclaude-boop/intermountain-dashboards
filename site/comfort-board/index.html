@@ -83,6 +83,29 @@ table.g .dim{color:var(--faint)}
 .trend.p{color:var(--good)}.trend.n{color:var(--bad)}.trend.z{color:var(--faint)}
 .edit{cursor:pointer}
 .edit:hover{outline:2px dashed var(--accent);outline-offset:-2px;border-radius:6px}
+.setup-top{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:16px;margin-bottom:14px}
+.krow{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-bottom:10px}
+.ktile{border-radius:10px;padding:12px 8px;text-align:center;background:var(--accent);color:var(--accent-ink)}
+.ktile .kv{font-size:19px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis}
+.ktile .kl{font-size:9.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;opacity:.85;margin-top:5px}
+.ktile.dark{background:#2e3542;color:#fff}
+:root[data-theme="dark"] .ktile.dark{background:#3a4150}
+.pa-side{display:flex;flex-direction:column;gap:12px}
+.pa-card{background:var(--surface);border:1px solid var(--hair);border-radius:12px;padding:12px 14px}
+.pa-duo{display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:center}
+.pa-duo b,.pa-item b,.strip b{display:block;font-size:21px;font-weight:800;font-variant-numeric:tabular-nums}
+.pa-duo span,.pa-item span,.strip span{font-size:10.5px;font-weight:700;color:var(--muted)}
+.pa-pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.pa-pill{text-align:center;font-size:10.5px;font-weight:800;letter-spacing:.08em;border-radius:999px;padding:5px 0;margin-bottom:8px;background:var(--surface2);color:var(--muted);border:1px solid var(--hair)}
+.pa-pill.act{background:#e9c83d;color:#3d3305;border-color:transparent}
+:root[data-theme="dark"] .pa-pill.act{background:rgba(240,178,104,.30);color:var(--warn)}
+.pa-plan{background:var(--surface2)}
+.pa-act{background:var(--warn-bg)}
+.pa-item{text-align:center;padding:8px 0}
+.pa-item+.pa-item{border-top:1px solid var(--hair)}
+.strip{display:grid;grid-template-columns:repeat(3,1fr);text-align:center;margin-bottom:16px}
+@media(max-width:1200px){.setup-top{grid-template-columns:1fr}}
+@media(max-width:700px){.krow{grid-template-columns:repeat(3,minmax(0,1fr))}.pa-pair{grid-template-columns:1fr}}
 .setup-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:14px}
 .setup-box{background:var(--surface);border:1px solid var(--hair);border-radius:10px;overflow:hidden}
 .setup-box h3{font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);padding:10px 14px 6px}
@@ -123,7 +146,6 @@ table.g .dim{color:var(--faint)}
 const BUDGET_URL="https://script.google.com/macros/s/AKfycby-J4xARcDQoDUwSfX6qsjYnM_QZyDfhd09WVBQXomJkLsrDysnkw-L0EZu0_S9Q4kz-w/exec";
 const DATA_URL="data.json";
 const REFRESH_MINUTES=5;
-const TREND_DAYS=3;          // trend arrows compare the last N full days to the N before
 
 const PIN_KEY="pcc-pin";
 const LS_KEY="cr-settings-v1";
@@ -217,7 +239,7 @@ function chip(v,fmt){
   return'<span class="chip '+cls+'">'+s+'</span>';
 }
 
-// ── 3-day trend arrows ──
+// ── daily series (Recent Days table) ──
 // One entry per calendar day with any activity: {leads, sold, revenue, turns}
 function dailySeries(){
   var b=B(),out={};
@@ -241,66 +263,6 @@ function dailySeries(){
   });
   return out;
 }
-// company-active full days (before today), the shared clock for every trend
-function activeDays(){
-  var b=B(),series=dailySeries();
-  return Object.keys(series).filter(function(d){return d<b.today&&(series[d].leads||series[d].turns)}).sort();
-}
-// compare avg of getVal over the last N active days vs the N before them
-function trendCalc(getVal){
-  var days=activeDays();
-  if(days.length<TREND_DAYS+1)return null;
-  var recent=days.slice(-TREND_DAYS),prior=days.slice(-TREND_DAYS*2,-TREND_DAYS);
-  if(!prior.length)return null;
-  function avg(list){var s=0;list.forEach(function(d){s+=getVal(d)});return s/list.length}
-  var a=avg(recent),p=avg(prior);
-  if(p===0&&a===0)return{dir:0,pct:0,quiet:true};
-  if(p===0)return{dir:1,pct:null};
-  var ch=(a-p)/p*100;
-  return{dir:ch>2?1:ch<-2?-1:0,pct:Math.abs(Math.round(ch))};
-}
-function trendHtml(t,label){
-  if(!t)return"";
-  if(t.quiet)return'<span class="dash">&mdash;</span>';
-  var arrow=t.dir>0?"&#9650;":t.dir<0?"&#9660;":"&#9654;";
-  var cls=t.dir>0?"up":t.dir<0?"down":"flat";
-  var txt=t.pct===null?"new":(t.dir===0?"steady":(t.pct+"%"));
-  return'<span class="chip '+cls+'" title="'+label+': last '+TREND_DAYS+' days vs the '+TREND_DAYS+' before">'+arrow+' '+txt+'</span>';
-}
-function trendOf(metric){
-  var series=dailySeries();
-  var f={
-    revenue:function(x){return x.revenue},
-    leads:function(x){return x.leads},
-    close:function(x){return x.leads?x.sold/x.leads:0},
-    turns:function(x){return x.turns},
-  }[metric];
-  return trendCalc(function(d){return f(series[d])});
-}
-function trendChip(metric,label){
-  var t=trendOf(metric);
-  return t&&!t.quiet?trendHtml(t,label):"";
-}
-// one advisor's revenue on a day (all lead types)
-function advisorDayRev(id){
-  var b=B();
-  return function(d){
-    var cell=(b.advisorDaily[d]||{})[String(id)];
-    if(!cell)return 0;
-    var s=0;
-    TYPES.forEach(function(t){if(cell[t[0]])s+=cell[t[0]][2]});
-    return s;
-  };
-}
-// one tech's turnovers created on a day
-function techDayTurns(id){
-  var b=B();
-  return function(d){
-    var c=(b.techDaily[d]||{})[String(id)];
-    return c?(c.codTurn||0)+(c.maintTurn||0):0;
-  };
-}
-
 // planned monthly expectations: leads x close% x avg ticket
 function planCalc(){
   var svc=plan("svcCalls"),to=plan("toRate");
@@ -425,17 +387,17 @@ function renderScore(){
       (p.revenue!==null?
         '<div class="capbar"><i style="width:'+Math.min(rev/p.revenue*100,100).toFixed(0)+'%"></i></div>'+
         '<div class="c-sub">'+pct(rev,p.revenue)+' of '+fmt$(p.revenue)+' plan'+(toDate!==null?' '+chip(rev-toDate,fmt$):'')+'</div>'
-        :'<div class="c-sub">set the plan in Monthly Setup '+trendChip("revenue","Revenue per day")+'</div>')+'</div>'+
+        :'<div class="c-sub">set the plan in Monthly Setup</div>')+'</div>'+
     '<div class="card"><div class="c-label">Full-Month Pace</div><div class="c-val">'+fmt$(pace)+'</div>'+
-      '<div class="c-sub">'+clock.elapsed+' of '+clock.total+' work days in'+(p.revenue!==null?' '+chip(pace-p.revenue,fmt$):'')+' '+trendChip("revenue","Revenue per day")+'</div></div>'+
+      '<div class="c-sub">'+clock.elapsed+' of '+clock.total+' work days in'+(p.revenue!==null?' '+chip(pace-p.revenue,fmt$):'')+'</div></div>'+
     '<div class="card"><div class="c-label">Leads Ran</div><div class="c-val">'+m._total.leads+'</div>'+
-      '<div class="c-sub">'+m._total.sold+' sold MTD '+trendChip("leads","Leads per day")+'</div></div>'+
+      '<div class="c-sub">'+m._total.sold+' sold MTD</div></div>'+
     '<div class="card"><div class="c-label">Close Rate</div><div class="c-val">'+(m._total.leads?Math.round(m._total.sold/m._total.leads*100)+"%":"&mdash;")+'</div>'+
-      '<div class="c-sub">'+m._total.sold+' of '+m._total.leads+' leads '+trendChip("close","Close rate")+'</div></div>'+
+      '<div class="c-sub">'+m._total.sold+' of '+m._total.leads+' leads</div></div>'+
     '<div class="card"><div class="c-label">Avg Sale</div><div class="c-val">'+(m._total.sold?fmt$(rev/m._total.sold):"&mdash;")+'</div>'+
       '<div class="c-sub">'+(m._total.leads?fmt$(rev/m._total.leads)+" per lead ran":"")+'</div></div>'+
     '<div class="card"><div class="c-label">Turnover Rate</div><div class="c-val">'+(ropps?Math.round(turns/ropps*100)+"%":"&mdash;")+'</div>'+
-      '<div class="c-sub">'+turns+' turns on '+ropps+' ROPPs ran'+(toPlan!==null?' &middot; plan '+toPlan+'%':'')+' '+trendChip("turns","Turns per day")+'</div></div>'+
+      '<div class="c-sub">'+turns+' turns on '+ropps+' ROPPs ran'+(toPlan!==null?' &middot; plan '+toPlan+'%':'')+'</div></div>'+
     '<div class="card"><div class="c-label">Turnover Cancels</div><div class="c-val">'+b.turnoverCancels+'</div>'+
       '<div class="c-sub">'+pct(b.turnoverCancels,turns+b.turnoverCancels)+' of turns booked</div></div>'+
   '</div>';
@@ -507,7 +469,7 @@ function renderScore(){
     }).join("")+'</tbody></table></div></div>';
 
   document.getElementById("app").innerHTML=shell(cards+tbl+daily+'<div class="duo">'+advTbl+techTbl+'</div>',
-    "Trend arrows compare the last "+TREND_DAYS+" full days to the "+TREND_DAYS+" before &middot; plan comes from Monthly Setup &middot; pace clock = Mon&ndash;Sat work days"+(plan("workdays")!==null?" capped at "+plan("workdays")+" budgeted":""),false);
+    "Plan comes from Monthly Setup &middot; pace clock = Mon&ndash;Sat work days"+(plan("workdays")!==null?" capped at "+plan("workdays")+" budgeted":""),false);
 }
 
 // ── advisors: batting order per lead type ──
@@ -565,9 +527,9 @@ function battingSection(rows){
 function renderAdvisors(){
   var b=B(),rows=day==="mtd"?b.advisors:advisorsForDay(day);
   var cols=typeCols(),mtd=day==="mtd";
-  var h1='<tr><th rowspan="2" style="vertical-align:bottom">Advisor</th><th colspan="'+(mtd?7:6)+'" class="grp">Totals</th>'+
+  var h1='<tr><th rowspan="2" style="vertical-align:bottom">Advisor</th><th colspan="6" class="grp">Totals</th>'+
     cols.map(function(t){return'<th colspan="5" class="grp tt-'+t[2]+'">'+t[1]+'</th>'}).join("")+'</tr>';
-  var h2='<tr><th class="grp">Leads</th><th>Sold</th><th>Close</th><th>Revenue</th><th>Avg Sale</th><th>$/Lead</th>'+(mtd?'<th>3-Day</th>':'')+
+  var h2='<tr><th class="grp">Leads</th><th>Sold</th><th>Close</th><th>Revenue</th><th>Avg Sale</th><th>$/Lead</th>'+
     cols.map(function(){return'<th class="grp">Leads</th><th>Sold</th><th>Close</th><th>Avg Sale</th><th>Revenue</th>'}).join("")+'</tr>';
   var body=rows.map(function(a,i){
     var t=a.total;
@@ -575,8 +537,7 @@ function renderAdvisors(){
       '<td class="grp">'+n0(t.leads)+'</td><td>'+n0(t.sold)+'</td><td>'+pct(t.sold,t.leads)+'</td>'+
       '<td><b>'+fmt$0(t.revenue)+'</b></td>'+
       '<td>'+(t.sold?fmt$(t.revenue/t.sold):'<span class="dash">&mdash;</span>')+'</td>'+
-      '<td>'+(t.leads?fmt$(t.revenue/t.leads):'<span class="dash">&mdash;</span>')+'</td>'+
-      (mtd?'<td>'+trendHtml(trendCalc(advisorDayRev(a.id)),a.name+" revenue/day")+'</td>':'');
+      '<td>'+(t.leads?fmt$(t.revenue/t.leads):'<span class="dash">&mdash;</span>')+'</td>';
     cols.forEach(function(c){
       var x=a.types[c[0]];
       tr+='<td class="grp">'+n0(x.leads)+'</td><td>'+n0(x.sold)+'</td><td>'+pct(x.sold,x.leads)+'</td>'+
@@ -592,13 +553,12 @@ function renderAdvisors(){
   });
   var trow='<tr class="tot"><td>TEAM</td><td class="grp">'+tot.leads+'</td><td>'+tot.sold+'</td><td>'+pct(tot.sold,tot.leads)+'</td>'+
     '<td>'+fmt$(tot.revenue)+'</td><td>'+(tot.sold?fmt$(tot.revenue/tot.sold):"&mdash;")+'</td><td>'+(tot.leads?fmt$(tot.revenue/tot.leads):"&mdash;")+'</td>'+
-    (mtd?'<td>'+trendChip("revenue","Team revenue/day")+'</td>':'')+
     cols.map(function(c){var x=ttypes[c[0]];return'<td class="grp">'+x.leads+'</td><td>'+x.sold+'</td><td>'+pct(x.sold,x.leads)+'</td>'+
       '<td>'+(x.sold?fmt$(x.revenue/x.sold):'<span class="dash">&mdash;</span>')+'</td><td>'+fmt$0(x.revenue)+'</td>'}).join("")+'</tr>';
   var empty='<div style="text-align:center;padding:40px;color:var(--faint);font-weight:600">No advisor activity for this day.</div>';
   var inner=rows.length?'<div class="tbl-scroll"><table class="g"><thead>'+h1+h2+'</thead><tbody>'+body+trow+'</tbody></table></div>'+battingSection(rows):empty;
   document.getElementById("app").innerHTML=shell(inner,
-    "Leads = completed sales-BU runs, day of run &middot; sold + revenue = the CA's sold estimates, day sold"+(mtd?" &middot; 3-Day = the advisor's revenue/day, last "+TREND_DAYS+" full days vs the "+TREND_DAYS+" before":"")+" &middot; Gained/Lost = revenue &minus; leads ran &times; plan close % &times; plan avg ticket (Monthly Setup)",true);
+    "Leads = completed sales-BU runs, day of run &middot; sold + revenue = the CA's sold estimates, day sold &middot; Gained/Lost = revenue &minus; leads ran &times; plan close % &times; plan avg ticket (Monthly Setup)",true);
 }
 
 // ── turnovers ──
@@ -607,11 +567,11 @@ function renderTurnovers(){
   var h1='<tr><th rowspan="2" style="vertical-align:bottom">Technician</th>'+
     '<th colspan="3" class="grp">Opportunities Ran</th>'+
     '<th rowspan="2" style="vertical-align:bottom" class="grp">ROPPs Ran</th>'+
-    '<th colspan="'+(mtd?4:3)+'" class="grp">Turned Over</th>'+
+    '<th colspan="3" class="grp">Turned Over</th>'+
     '<th rowspan="2" style="vertical-align:bottom">TO Rate</th><th colspan="2" class="grp">T/O Ran</th>'+
     '<th colspan="3" class="grp">Sales from Turns</th></tr>';
   var h2='<tr><th class="grp">COD</th><th>Maint</th><th>Total</th>'+
-    '<th class="grp">COD</th><th>Maint</th><th>Total</th>'+(mtd?'<th>3-Day</th>':'')+
+    '<th class="grp">COD</th><th>Maint</th><th>Total</th>'+
     '<th class="grp">COD</th><th>Maint</th><th class="grp"># Sold</th><th>Revenue</th><th>$/Opp</th></tr>';
   var sums=dict0();
   function dict0(){var o={};T_FIELDS.forEach(function(f){o[f]=0});o.opps=0;o.turns=0;return o}
@@ -621,7 +581,6 @@ function renderTurnovers(){
       '<td class="grp">'+n0(r.codOpp)+'</td><td>'+n0(r.maintOpp)+'</td><td><b>'+n0(r.opps)+'</b></td>'+
       '<td class="grp"><b>'+n0(r.ropps||0)+'</b></td>'+
       '<td class="grp">'+n0(r.codTurn)+'</td><td>'+n0(r.maintTurn)+'</td><td><b>'+n0(r.turns)+'</b></td>'+
-      (mtd?'<td>'+trendHtml(trendCalc(techDayTurns(r.id)),r.name+" turns/day")+'</td>':'')+
       '<td>'+pct(r.turns,r.ropps||0)+'</td>'+
       '<td class="grp">'+n0(r.codRan)+'</td><td>'+n0(r.maintRan)+'</td>'+
       '<td class="grp">'+n0(r.codSold+r.maintSold)+'</td><td><b>'+fmt$0(r.codRev+r.maintRev)+'</b></td>'+
@@ -631,7 +590,6 @@ function renderTurnovers(){
     '<td class="grp">'+sums.codOpp+'</td><td>'+sums.maintOpp+'</td><td>'+sums.opps+'</td>'+
     '<td class="grp">'+sums.ropps+'</td>'+
     '<td class="grp">'+sums.codTurn+'</td><td>'+sums.maintTurn+'</td><td>'+sums.turns+'</td>'+
-    (mtd?'<td>'+trendChip("turns","Team turns/day")+'</td>':'')+
     '<td>'+pct(sums.turns,sums.ropps)+'</td>'+
     '<td class="grp">'+(sums.codRan)+'</td><td>'+(sums.maintRan)+'</td>'+
     '<td class="grp">'+(sums.codSold+sums.maintSold)+'</td><td>'+fmt$(sums.codRev+sums.maintRev)+'</td>'+
@@ -639,12 +597,113 @@ function renderTurnovers(){
   var empty='<div style="text-align:center;padding:40px;color:var(--faint);font-weight:600">No technician activity for this day.</div>';
   var inner=rows.length?'<div class="tbl-scroll"><table class="g"><thead>'+h1+h2+'</thead><tbody>'+body+trow+'</tbody></table></div>':empty;
   document.getElementById("app").innerHTML=shell(inner,
-    "Opps = completed opportunity jobs in the HVAC demand/maintenance BUs &middot; ROPPs = ROPP-tagged completed jobs (net of Management Removed) &middot; TO Rate = turns &divide; ROPPs ran &middot; turns = sales jobs the tech generated (canceled excluded) &middot; sales credit the generating tech &middot; $/Opp = turn revenue &divide; opportunities ran"+(mtd?" &middot; 3-Day = the tech's turns/day, last "+TREND_DAYS+" full days vs the "+TREND_DAYS+" before":""),true);
+    "Opps = completed opportunity jobs in the HVAC demand/maintenance BUs &middot; ROPPs = ROPP-tagged completed jobs (net of Management Removed) &middot; TO Rate = turns &divide; ROPPs ran &middot; turns = sales jobs the tech generated (canceled excluded) &middot; sales credit the generating tech &middot; $/Opp = turn revenue &divide; opportunities ran",true);
 }
 
 // ── setup ──
+// Daily scoreboard layout modeled on the Power BI comfort dashboard: today's
+// KPI tiles per lead type, workdays + planned-vs-actual pace cards, calls-ran
+// strip, Actual MTD vs Expectations MTD tables, then the plan inputs.
 function renderSetup(){
-  var p=planCalc();
+  var b=B(),p=planCalc(),clock=workdayClock(),m=mtdTotals();
+  var frac=clock.total?clock.elapsed/clock.total:0;
+  function fmtPar(v){var s="$"+Math.round(Math.abs(v)).toLocaleString();return v<0?"("+s+")":s}
+
+  // today's advisor activity by lead type
+  var dt={},dtot={leads:0,sold:0,revenue:0};
+  TYPES.forEach(function(t){dt[t[0]]={leads:0,sold:0,revenue:0}});
+  advisorsForDay(b.today).forEach(function(a){
+    TYPES.forEach(function(t){var x=a.types[t[0]];
+      dt[t[0]].leads+=x.leads;dt[t[0]].sold+=x.sold;dt[t[0]].revenue+=x.revenue;
+      dtot.leads+=x.leads;dtot.sold+=x.sold;dtot.revenue+=x.revenue});
+  });
+  // today's service opportunity calls (tech runs)
+  var demand=0,maintc=0;
+  techsForDay(b.today).forEach(function(r){demand+=r.codOpp;maintc+=r.maintOpp});
+  // MTD service calls + month-end paces
+  var svcMtd=0;b.techs.forEach(function(t){svcMtd+=(t.codOpp||0)+(t.maintOpp||0)});
+  var svcPace=clock.elapsed?Math.round(svcMtd/clock.elapsed*clock.total):null;
+  var revPace=clock.elapsed?m._total.revenue/clock.elapsed*clock.total:null;
+  var plannedDaily=(p.revenue!==null&&clock.total)?p.revenue/clock.total:null;
+
+  function tile(v,l,dark){return'<div class="ktile'+(dark?" dark":"")+'"><div class="kv">'+v+'</div><div class="kl">'+l+'</div></div>'}
+  var NAMES={turnover:"TGL",marketed:"Marketed",costco:"Costco",selfgen:"Self-Gen"};
+  var tiles=typeCols().map(function(t){
+    var k=t[0],n=NAMES[k],x=dt[k],pl=p.types[k].leads;
+    return'<div class="krow">'+
+      tile(pl!==null?Math.round(pl):"--",n+" Planned Leads")+
+      tile(x.leads,n+" Leads Ran")+tile(x.sold,n+" Leads Sold")+
+      tile(fmt$(x.revenue),n+" Revenue")+
+      tile(x.leads?Math.round(x.sold/x.leads*100)+"%":"--",n+" Conv. Rate")+
+      tile(x.sold?fmt$(x.revenue/x.sold):"--",n+" Avg. Sale")+'</div>';
+  }).join("");
+  var plTotal=null;
+  typeCols().forEach(function(t){var l=p.types[t[0]].leads;if(l!==null)plTotal=(plTotal||0)+l});
+  tiles+='<div class="krow">'+
+    tile(plTotal!==null?Math.round(plTotal):"--","Total Planned Leads",1)+
+    tile(dtot.leads,"Total Leads Ran",1)+tile(dtot.sold,"Total Leads Sold",1)+
+    tile(fmt$(dtot.revenue),"Total Leads Revenue",1)+
+    tile(dtot.leads?Math.round(dtot.sold/dtot.leads*100)+"%":"--","Total Conv. Rate",1)+
+    tile(dtot.sold?fmt$(dtot.revenue/dtot.sold):"--","Total Avg. Sale",1)+'</div>';
+
+  var side='<div class="pa-side">'+
+    '<div class="pa-card"><div class="pa-duo">'+
+      '<div><b>'+clock.total+'</b><span>Workdays in the Month</span></div>'+
+      '<div><b>'+clock.elapsed+'</b><span>Workdays MTD</span></div></div></div>'+
+    '<div class="pa-pair">'+
+      '<div><div class="pa-pill">PLANNED</div><div class="pa-card pa-plan">'+
+        '<div class="pa-item"><b>'+(plannedDaily!==null?fmt$(plannedDaily):"--")+'</b><span>Planned Daily HVAC Revenue</span></div>'+
+        '<div class="pa-item"><b>'+(plan("svcCalls")!==null?plan("svcCalls"):"--")+'</b><span>Planned Service HVAC Calls for the Month</span></div>'+
+        '<div class="pa-item"><b>'+(p.revenue!==null?fmt$(p.revenue):"--")+'</b><span>Planned HVAC Revenue</span></div></div></div>'+
+      '<div><div class="pa-pill act">ACTUAL</div><div class="pa-card pa-act">'+
+        '<div class="pa-item"><b>'+fmt$(dtot.revenue)+'</b><span>Actual Daily HVAC Revenue</span></div>'+
+        '<div class="pa-item"><b>'+(svcPace!==null?svcPace:"--")+'</b><span>Actual HVAC Service Call Pace</span></div>'+
+        '<div class="pa-item"><b>'+(revPace!==null?fmt$(revPace):"--")+'</b><span>Actual HVAC Revenue Pace</span></div></div></div>'+
+    '</div></div>';
+
+  var strip='<div class="pa-card strip">'+
+    '<div><b>'+demand+'</b><span>Demand Calls Ran Today</span></div>'+
+    '<div><b>'+maintc+'</b><span>Maintenance (SPP) Calls Ran Today</span></div>'+
+    '<div><b>'+(demand+maintc)+'</b><span>Total Opportunity Calls Today</span></div></div>';
+
+  // Actual MTD table
+  var aRows="";
+  typeCols().forEach(function(t){
+    var x=m[t[0]];
+    aRows+='<tr><td class="tt-'+t[2]+'" style="font-weight:800">'+t[1]+'</td>'+
+      '<td>'+n0(x.leads)+'</td><td>'+n0(x.sold)+'</td><td>'+pct(x.sold,x.leads)+'</td>'+
+      '<td>'+(x.sold?fmt$(x.revenue/x.sold):'<span class="dash">&mdash;</span>')+'</td><td>'+fmt$0(x.revenue)+'</td></tr>';
+  });
+  var mt=m._total;
+  aRows+='<tr class="tot"><td>Total</td><td>'+mt.leads+'</td><td>'+mt.sold+'</td><td>'+pct(mt.sold,mt.leads)+'</td>'+
+    '<td>'+(mt.sold?fmt$(mt.revenue/mt.sold):"&mdash;")+'</td><td>'+fmt$(mt.revenue)+'</td></tr>';
+  var actualTbl='<div><div class="sect">Actual MTD &middot; Leads &amp; Sales Results</div><div class="tbl-scroll"><table class="g"><thead><tr>'+
+    '<th>Lead Type</th><th>Leads</th><th>Sales</th><th>Close %</th><th>Avg. Sale</th><th>Revenue</th></tr></thead><tbody>'+aRows+'</tbody></table></div></div>';
+
+  // Expectations MTD table: the plan prorated to workdays elapsed
+  var eRows="",teLeads=0,teSales=0,teRev=0,teRevVar=0,teSalesVar=0;
+  typeCols().forEach(function(t){
+    var k=t[0],e=p.types[k],a=m[k];
+    var eLeads=e.leads!==null?e.leads*frac:null;
+    var eSales=e.sales!==null?e.sales*frac:null;
+    var eRev=e.revenue!==null?e.revenue*frac:null;
+    var revVar=a.revenue-(eRev||0),salesVar=a.sold-(eSales||0);
+    teLeads+=eLeads||0;teSales+=eSales||0;teRev+=eRev||0;teRevVar+=revVar;teSalesVar+=salesVar;
+    eRows+='<tr><td class="tt-'+t[2]+'" style="font-weight:800">'+t[1]+'</td>'+
+      '<td>'+(eLeads!==null?Math.round(eLeads):"&mdash;")+'</td>'+
+      '<td>'+(e.close!==null?e.close+"%":"&mdash;")+'</td>'+
+      '<td>'+(e.avg!==null?fmt$(e.avg):"&mdash;")+'</td>'+
+      '<td>'+(eSales!==null?eSales.toFixed(1):"&mdash;")+'</td>'+
+      '<td>'+(eRev!==null?fmt$(eRev):"&mdash;")+'</td>'+
+      '<td style="color:var(--'+(revVar>=0?'good':'bad')+')">'+fmtPar(revVar)+'</td>'+
+      '<td style="color:var(--'+(salesVar>=0?'good':'bad')+')">'+(salesVar<0?"("+Math.abs(Math.round(salesVar*10)/10)+")":Math.round(salesVar*10)/10)+'</td></tr>';
+  });
+  eRows+='<tr class="tot"><td>Total</td><td>'+Math.round(teLeads)+'</td><td></td><td></td><td>'+teSales.toFixed(1)+'</td><td>'+fmt$(teRev)+'</td>'+
+    '<td style="color:var(--'+(teRevVar>=0?'good':'bad')+')">'+fmtPar(teRevVar)+'</td>'+
+    '<td style="color:var(--'+(teSalesVar>=0?'good':'bad')+')">'+(teSalesVar<0?"("+Math.abs(Math.round(teSalesVar*10)/10)+")":Math.round(teSalesVar*10)/10)+'</td></tr>';
+  var expTbl='<div><div class="sect">Expectations MTD &middot; Leads &amp; Sales Results</div><div class="tbl-scroll"><table class="g"><thead><tr>'+
+    '<th>Lead Type</th><th>Leads</th><th>Close %</th><th>Avg. Sale</th><th>Sales</th><th>Revenue</th><th>Rev. Var.</th><th>Sales Var.</th></tr></thead><tbody>'+eRows+'</tbody></table></div></div>';
+
   function row(f,l){
     var v=plan(f);
     return'<div class="row edit" onclick="editPlan(\''+f+'\',\''+l+'\')"><span>'+l+'</span><b>'+(v===null?'<span class="dash">tap to set</span>':(f.indexOf("avg")===0?fmt$(v):v+(f.indexOf("close")===0||f==="toRate"?"%":"")))+'</b></div>';
@@ -655,21 +714,13 @@ function renderSetup(){
     '<div class="setup-box"><h3>Close % by Lead Type</h3>'+row("closeTurn","Turnover close %")+row("closeMkt","Marketed close %")+(B().hasCostco?row("closeCostco","Costco close %"):"")+row("closeSelf","Self-gen close %")+'</div>'+
     '<div class="setup-box"><h3>Average Ticket by Lead Type</h3>'+row("avgTurn","Turnover avg ticket $")+row("avgMkt","Marketed avg ticket $")+(B().hasCostco?row("avgCostco","Costco avg ticket $"):"")+row("avgSelf","Self-gen avg ticket $")+'</div>'+
   '</div>';
-  var rows="";
-  typeCols().forEach(function(t){
-    var e=p.types[t[0]];
-    rows+='<tr><td class="tt-'+t[2]+'" style="font-weight:800">'+t[1]+'</td>'+
-      '<td>'+(e.leads!==null?Math.round(e.leads):"&mdash;")+'</td>'+
-      '<td>'+(e.close!==null?e.close+"%":"&mdash;")+'</td>'+
-      '<td>'+(e.sales!==null?e.sales.toFixed(1):"&mdash;")+'</td>'+
-      '<td>'+(e.avg!==null?fmt$(e.avg):"&mdash;")+'</td>'+
-      '<td>'+(e.revenue!==null?fmt$(e.revenue):"&mdash;")+'</td></tr>';
-  });
-  rows+='<tr class="tot"><td>PLANNED MONTH</td><td></td><td></td><td>'+(p.sales!==null?p.sales.toFixed(1):"&mdash;")+'</td><td></td><td>'+(p.revenue!==null?fmt$(p.revenue):"&mdash;")+'</td></tr>';
-  var tbl='<div class="sect">What the Plan Works Out To</div><div class="tbl-scroll"><table class="g" style="min-width:560px"><thead><tr>'+
-    '<th>Lead Type</th><th>Planned Leads</th><th>Close %</th><th>Planned Sales</th><th>Avg Ticket</th><th>Planned Revenue</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
-  document.getElementById("app").innerHTML=shell(boxes+tbl,
-    "Tap any value to edit &middot; edits ask for the PIN once and are shared with every viewer &middot; planned turnover leads = service calls &times; turnover rate",false);
+
+  document.getElementById("app").innerHTML=shell(
+    '<div class="sect">Today &middot; '+dowOf(b.today)+' '+fmtDay(b.today)+'</div>'+
+    '<div class="setup-top"><div>'+tiles+'</div>'+side+'</div>'+strip+
+    '<div class="duo">'+actualTbl+expTbl+'</div>'+
+    '<div class="sect">Plan Inputs &middot; tap to edit</div>'+boxes,
+    "Plan edits ask for the PIN once and are shared with every viewer &middot; planned turnover leads = service calls &times; turnover rate &middot; expectations prorate the plan to workdays elapsed &middot; pace = MTD &divide; workdays MTD &times; workdays in month",false);
 }
 
 function render(){
