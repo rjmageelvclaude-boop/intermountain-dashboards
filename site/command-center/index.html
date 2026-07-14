@@ -325,6 +325,8 @@ function render(){
   var planPace=bd>0?monthlyPlan*bdc/bd:0;
   var adjDaily=bdLeft>0?Math.max((monthlyBudget-mtdRev)/bdLeft,0):0;
   var adjPlan=bdLeft>0?Math.max((monthlyPlan-mtdRev)/bdLeft,0):0;
+  // Current pace: yesterday's EOD MTD run-rate projected across the full month's budgeted days
+  var monthPace=bdc>0?mtdRev/bdc*bd:0;
   var flipRate=g("hvacRoppsRan")>0?(g("tglsSet")/g("hvacRoppsRan"))*100:0;
   var hvacRan=g("hvacMaintenanceRan")+g("hvacDemandRan");
   var hvacAvg=hvacRan>0?g("hvacServiceRevenue")/hvacRan:0;
@@ -361,6 +363,12 @@ function render(){
     return'<div style="font-size:10px;margin-top:3px;font-weight:600;color:'+(ok?"#16a34a":"#ef4444")+'">'+label+' pace $'+Math.round(target).toLocaleString()+' · '+(ok?"+":"−")+'$'+Math.abs(Math.round(diff)).toLocaleString()+' ('+pct+'%)</div>';
   }
   var mtdCompare='<div style="margin-top:4px">'+paceLine("Budget",budgetPace)+paceLine("Plan",planPace)+'</div>';
+  var paceCompare="";
+  if(bdc>0&&monthlyBudget>0){
+    var pDiff=monthPace-monthlyBudget,pOk=pDiff>=0,pPct=Math.round(monthPace/monthlyBudget*100);
+    paceCompare='<div style="font-size:10px;margin-top:4px;font-weight:600;color:'+(pOk?"#16a34a":"#ef4444")+'">Budget $'+Math.round(monthlyBudget).toLocaleString()+' · '+(pOk?"+":"−")+'$'+Math.abs(Math.round(pDiff)).toLocaleString()+' ('+pPct+'%)</div>';
+  }
+  var paceSub=bdc>0?("Projected month total · "+bdc+" of "+bd+" budgeted days in"):"Waiting on first completed budgeted day";
   var thruD=mtdThrough?new Date(mtdThrough+"T12:00:00"):null;
   var mtdSub=thruD?(thruD.toLocaleDateString("en-US",{month:"short"})+" 1 – "+thruD.toLocaleDateString("en-US",{month:"short",day:"numeric"})+(mtdLive?" · live from ST":"")):(mtdLive?"First day of month":"Manual override");
 
@@ -457,6 +465,7 @@ function render(){
     '<div class="main"><div class="hero-grid">'+
     hero("Today's Revenue",dailyRev,"$",dailyRevBgt,null,true)+
     hero("Today's Sales",dailySales,"$",dailySalesBgt,null,true)+
+    hero("Current Pace",monthPace,"$",monthlyBudget,paceSub,true,paceCompare)+
     hero("MTD Revenue",mtdRev,"$",monthlyBudget,mtdSub,true,mtdCompare)+
     hero("MTD Sales",mtdSales,"$",null,mtdSub,false)+
     hero("Adjusted Daily Budget",adjDaily,"$",null,bdLeft>0?bdLeft+" budgeted days left (incl. today)":"Month complete",false)+
