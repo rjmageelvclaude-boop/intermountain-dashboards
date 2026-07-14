@@ -63,6 +63,8 @@ select.daypick{border:1px solid var(--hair2);background:var(--surface);color:var
 .sect{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin:18px 2px 9px}
 .duo{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .batgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(560px,100%),1fr));gap:16px}
+.defs{margin:16px 2px 6px;font-size:12.5px;font-weight:500;color:var(--muted);line-height:1.65;display:flex;flex-direction:column;gap:6px}
+.defs b{color:var(--ink)}
 .tbl-scroll{overflow-x:auto;border:1px solid var(--hair);border-radius:10px;margin-bottom:16px}
 table.g{width:100%;border-collapse:separate;border-spacing:0;font-size:14px}
 table.g th,table.g td{padding:9px 13px;text-align:right;font-weight:600;border-bottom:1px solid var(--hair);white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -455,7 +457,11 @@ function renderScore(){
 // Mirrors the workbook's batting-order boards: advisors ranked by $ per lead
 // ran within each category. Gained/Lost = revenue - leads ran x (plan close %
 // x plan avg ticket) from Monthly Setup; dashes until the plan is entered.
+// Sales managers excluded from the batting orders (they still show in the
+// main advisor table above): Sierra - Ryan Hernlund.
+const BAT_EXCLUDE={sierra:[12289]};
 function battingSection(rows){
+  rows=rows.filter(function(a){return(BAT_EXCLUDE[co]||[]).indexOf(a.id)<0});
   var cats=[["turnover","Tech Generated Leads","turn","closeTurn","avgTurn"],
             ["marketed","Marketed Leads","mark","closeMkt","avgMkt"],
             ["costco","Costco Leads","cost","closeCostco","avgCostco"]]
@@ -499,7 +505,11 @@ function battingSection(rows){
       '<th>#</th><th>Comfort Advisor</th><th>Ran</th><th>Sold</th><th>Conv.</th><th>Revenue</th><th>Avg Sale</th><th>Gained / Lost Rev</th><th>$/Lead Ran</th>'+
       '</tr></thead><tbody>'+(list.length?body+trow:empty)+'</tbody></table></div></div>';
   }).join("");
-  return'<div class="sect">Batting Order &middot; ranked by $ per lead ran</div><div class="batgrid">'+boards+'</div>';
+  var defs='<div class="defs">'+
+    '<div><b>$/Lead Ran</b> &mdash; revenue sold &divide; leads ran: the average dollars an advisor produces every time they run a lead in that category. This is what the batting order is ranked by.</div>'+
+    '<div><b>Gained or Lost Revenue</b> &mdash; revenue sold &minus; (leads ran &times; planned close % &times; planned avg ticket): dollars above (green) or below (red) what the monthly plan expects from that many leads. The planned close % and avg ticket come from the Monthly Setup tab.</div>'+
+  '</div>';
+  return'<div class="sect">Batting Order &middot; ranked by $ per lead ran</div><div class="batgrid">'+boards+'</div>'+defs;
 }
 
 // ── advisors ──
@@ -537,7 +547,7 @@ function renderAdvisors(){
   var empty='<div style="text-align:center;padding:40px;color:var(--faint);font-weight:600">No advisor activity for this day.</div>';
   var inner=rows.length?'<div class="tbl-scroll"><table class="g"><thead>'+h1+h2+'</thead><tbody>'+body+trow+'</tbody></table></div>'+battingSection(rows):empty;
   document.getElementById("app").innerHTML=shell(inner,
-    "Leads = completed sales-BU runs, day of run &middot; sold + revenue = the CA's sold estimates, day sold &middot; Gained/Lost = revenue &minus; leads ran &times; plan close % &times; plan avg ticket (Monthly Setup)",true);
+    "Leads = completed sales-BU runs, day of run &middot; sold + revenue = the CA's sold estimates, day sold",true);
 }
 
 // ── turnovers ──
