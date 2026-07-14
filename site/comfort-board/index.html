@@ -132,7 +132,7 @@ const CO_KEY="cr-co-v1";
 const VIEW_KEY="cr-view-v1";
 const THEME_KEY="cr-theme";
 const COS=["sierra","ultimate","russett"];
-const VIEWS=[["score","Scoreboard"],["adv","Advisors"],["turn","Turnovers"],["setup","Monthly Setup"]];
+const VIEWS=[["score","Scoreboard"],["adv","Advisors"],["turn","Turnovers"],["dispatch","Tech Dispatch Order"],["setup","Monthly Setup"]];
 const TYPES=[["turnover","Turnover","turn"],["marketed","Marketed","mark"],["costco","Costco","cost"],["selfgen","Self-Gen","self"]];
 
 const PLAN_FIELDS=[
@@ -304,7 +304,7 @@ function advisorsForDay(iso){
   }).filter(function(a){return a.total.leads||a.total.sold||a.total.revenue})
     .sort(function(x,y){return y.total.revenue-x.total.revenue||y.total.leads-x.total.leads});
 }
-const T_FIELDS=["codOpp","maintOpp","ropps","codTurn","maintTurn","codRan","maintRan","codSold","codRev","maintSold","maintRev"];
+const T_FIELDS=["codOpp","maintOpp","ropps","codTurn","maintTurn","codRan","maintRan","codSold","codRev","maintSold","maintRev","canc"];
 function techsForDay(iso){
   var b=B(),d=b.techDaily[iso]||{};
   var byId={};b.techs.forEach(function(t){byId[String(t.id)]=t.name});
@@ -589,6 +589,82 @@ function renderTurnovers(){
     "Opps = completed opportunity jobs in the HVAC demand/maintenance BUs &middot; ROPPs = ROPP-tagged completed jobs (net of Management Removed) &middot; TO Rate = turns &divide; ROPPs ran &middot; turns = sales jobs the tech generated (canceled excluded) &middot; sales credit the generating tech &middot; $/Opp = turn sales &divide; opportunities ran",true);
 }
 
+// ── tech dispatch order ──
+// The workbook's Tech Dispatch Order sheet: techs ranked by TGL sales per
+// opportunity given (ROPPs). Techs with fewer than MIN_DISPATCH_OPPS opps
+// given drop to the bottom of the order - too small a sample to rank.
+const MIN_DISPATCH_OPPS=5;
+const PARTNER={sierra:"SIE",ultimate:"ULT",russett:"RUS"};
+function renderDispatch(){
+  var b=B(),bo=["rgba(230,185,60,.45)","rgba(150,160,175,.35)","rgba(200,120,60,.35)"];
+  var rows=b.techs.map(function(t){
+    var set=t.turns+(t.canc||0),ran=t.codRan+t.maintRan;
+    var sold=t.codSold+t.maintSold,sales=t.codRev+t.maintRev,opps=t.ropps||0;
+    return{name:t.name,opps:opps,set:set,canc:t.canc||0,ran:ran,sold:sold,sales:sales,
+           perOpp:opps?sales/opps:null};
+  }).filter(function(r){return r.opps||r.set||r.sales});
+  rows.sort(function(a,c){
+    var am=a.opps>=MIN_DISPATCH_OPPS?1:0,cm=c.opps>=MIN_DISPATCH_OPPS?1:0;
+    if(am!==cm)return cm-am;
+    return(c.perOpp===null?-1:c.perOpp)-(a.perOpp===null?-1:a.perOpp);
+  });
+  var pcts=rows.filter(function(r){return r.opps}).map(function(r){return r.set/r.opps});
+  var mn=Math.min.apply(null,pcts),mx=Math.max.apply(null,pcts);
+  var tot={opps:0,set:0,canc:0,ran:0,sold:0,sales:0};
+  rows.forEach(function(r){Object.keys(tot).forEach(function(k){tot[k]+=r[k]})});
+  function tglPctTd(set,opps){
+    if(!opps)return'<td><span class="dash">&mdash;</span></td>';
+    var v=set/opps,t=mx>mn?(v-mn)/(mx-mn):1;
+    return'<td style="background:hsla('+Math.round(55+t*75)+',60%,45%,.30)">'+Math.round(v*100)+'%</td>';
+  }
+  function cancelTd(canc,set){
+    if(!set)return'<td><span class="dash">&mdash;</span></td>';
+    var v=canc/set;
+    return'<td'+(v>=.5?' style="background:var(--bad-bg);color:var(--bad)"':'')+'>'+Math.round(v*100)+'%</td>';
+  }
+  function netTd(ran,opps){
+    return'<td style="background:rgba(230,185,60,.35);font-weight:800">'+(opps?Math.round(ran/opps*100)+'%':'<span class="dash">&mdash;</span>')+'</td>';
+  }
+  function perOppTd(sales,opps){
+    return'<td style="background:var(--good-bg);color:var(--good);font-weight:800">'+(opps?fmt$(sales/opps):'<span class="dash">&mdash;</span>')+'</td>';
+  }
+  var body=rows.map(function(r,i){
+    return'<tr><td style="font-weight:800'+(i<3?';background:'+bo[i]:'')+'">#'+(i+1)+'</td>'+
+      '<td style="text-align:left">'+r.name+(r.opps<MIN_DISPATCH_OPPS?' <span class="dash" title="Fewer than '+MIN_DISPATCH_OPPS+' opps given - ranked last">*</span>':'')+'</td>'+
+      '<td>'+PARTNER[co]+'</td>'+
+      '<td>'+n0(r.opps)+'</td><td>'+n0(r.set)+'</td>'+
+      tglPctTd(r.set,r.opps)+
+      '<td>'+n0(r.ran)+'</td><td>'+n0(r.canc)+'</td>'+
+      cancelTd(r.canc,r.set)+
+      netTd(r.ran,r.opps)+
+      '<td>'+n0(r.sold)+'</td><td><b>'+fmt$0(r.sales)+'</b></td>'+
+      '<td>'+pct(r.sold,r.ran)+'</td>'+
+      perOppTd(r.sales,r.opps)+'</tr>';
+  }).join("");
+  var trow='<tr class="tot"><td></td><td style="text-align:left">TEAM</td><td>'+PARTNER[co]+'</td>'+
+    '<td>'+tot.opps+'</td><td>'+tot.set+'</td>'+
+    '<td>'+pct(tot.set,tot.opps)+'</td>'+
+    '<td>'+tot.ran+'</td><td>'+tot.canc+'</td>'+
+    '<td>'+pct(tot.canc,tot.set)+'</td>'+
+    netTd(tot.ran,tot.opps)+
+    '<td>'+tot.sold+'</td><td>'+fmt$(tot.sales)+'</td>'+
+    '<td>'+pct(tot.sold,tot.ran)+'</td>'+
+    perOppTd(tot.sales,tot.opps)+'</tr>';
+  var head='<tr><th>#</th><th>Tech</th><th>Partner</th><th>Opps Given</th><th>TGLs Set</th><th>TGL %</th>'+
+    '<th>TGLs Ran</th><th>TGLs Canc.</th><th>Cancel Rate</th><th style="background:rgba(230,185,60,.35)">Net TGL %</th>'+
+    '<th>TGLs Sold</th><th>TGL Sales</th><th>C/A Conv. Rate</th><th style="background:var(--good-bg)">Sales per Opp</th></tr>';
+  var defs='<div class="defs">'+
+    '<div><b>Opps Given</b> &mdash; completed service calls carrying the ROPP tag (net of Management Removed): the replacement opportunities the tech was handed.</div>'+
+    '<div><b>TGLs Set</b> &mdash; turnovers the tech generated, day of creation, including ones later canceled &middot; <b>TGL %</b> = TGLs set &divide; opps given &middot; <b>Cancel Rate</b> = TGLs canceled &divide; TGLs set &middot; <b>Net TGL %</b> = TGLs ran &divide; opps given.</div>'+
+    '<div><b>C/A Conv. Rate</b> &mdash; TGLs sold &divide; TGLs ran: how often the comfort advisor closes the leads this tech turns over.</div>'+
+    '<div><b>Sales per Opp</b> &mdash; TGL sales &divide; opps given: dollars produced per replacement opportunity the tech was given. This is what the dispatch order is ranked by; techs with fewer than '+MIN_DISPATCH_OPPS+' opps given (*) drop to the bottom until they have a real sample.</div>'+
+  '</div>';
+  var empty='<div style="text-align:center;padding:40px;color:var(--faint);font-weight:600">No technician activity this month.</div>';
+  var inner=rows.length?'<div class="tbl-scroll"><table class="g"><thead>'+head+'</thead><tbody>'+body+trow+'</tbody></table></div>'+defs:empty;
+  document.getElementById("app").innerHTML=shell(inner,
+    "MTD &middot; TGL sales = active Sold estimate subtotals on the tech's turnovers, credited to the generating tech",false);
+}
+
 // ── setup ──
 // Actual MTD vs Expectations MTD tables, then the plan inputs.
 function renderSetup(){
@@ -669,6 +745,7 @@ function render(){
   document.documentElement.setAttribute("data-co",co);
   if(view==="adv")renderAdvisors();
   else if(view==="turn")renderTurnovers();
+  else if(view==="dispatch")renderDispatch();
   else if(view==="setup")renderSetup();
   else renderScore();
 }
