@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Install Callbacks — HVAC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Montserrat','Segoe UI',system-ui,sans-serif;background:#f2f3f5;color:#111;min-height:100vh}
+.wrap{max-width:1680px;margin:0 auto;padding:14px 22px 24px}
+.topbar{display:flex;align-items:center;gap:16px;margin-bottom:12px;flex-wrap:wrap}
+.big-title{font-size:38px;font-weight:900;letter-spacing:-1px;text-transform:uppercase;line-height:1}
+.big-title small{font-size:15px;font-weight:800;color:#888;margin-left:10px;letter-spacing:0}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+.tab{cursor:pointer;user-select:none;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#555;background:#e7e9ec;border:2px solid transparent;white-space:nowrap}
+.tab:hover{color:#111;border-color:#c9ced6}
+.tab.on{background:#111;color:#fff}
+
+.kpis{display:grid;grid-template-columns:repeat(8,1fr);gap:10px}
+.kpi{background:#fff;border-radius:12px;padding:13px 14px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.kpi .v{font-size:27px;font-weight:900;line-height:1.05;letter-spacing:-.5px;white-space:nowrap}
+.kpi .k{font-size:10.5px;font-weight:800;color:#8a919c;text-transform:uppercase;letter-spacing:.04em;margin-top:4px;line-height:1.2}
+.kpi .s{font-size:10.5px;font-weight:700;color:#555;margin-top:4px;line-height:1.25}
+.kpi.hero{background:#111827}
+.kpi.hero .v,.kpi.hero .s{color:#fff}
+.kpi.hero .k{color:rgba(255,255,255,.75)}
+.r-good{color:#15803d}.r-mid{color:#b45309}.r-bad{color:#b42318}
+
+.panels{display:grid;grid-template-columns:1.3fr 1.3fr 1fr;gap:12px;margin:12px 0}
+.panel{background:#fff;border-radius:12px;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,.08);min-height:250px;display:flex;flex-direction:column;min-width:0}
+.p-title{font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.05em;color:#555}
+.p-sub{font-size:10.5px;font-weight:700;color:#9aa1ab;margin-top:2px;line-height:1.35}
+.sline{flex:1;margin-top:12px;min-height:170px}
+.sline svg{width:100%;height:100%}
+
+.seglist{margin-top:14px;display:flex;flex-direction:column;gap:9px}
+.segrow{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700}
+.segrow .sn{width:84px;white-space:nowrap;color:#555}
+.segrow .track{flex:1;height:16px;background:#eef0f3;border-radius:4px;overflow:hidden}
+.segrow .fill{height:100%;border-radius:4px;min-width:2px;display:block}
+.segrow .gmn{width:46px;text-align:right;font-weight:900}
+.segrow .sub{width:56px;text-align:right;color:#9aa1ab;font-size:10.5px}
+
+.tablecard{background:#fff;border-radius:12px;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:12px}
+.t-title{font-size:17px;font-weight:900;text-transform:uppercase;letter-spacing:-.3px}
+.t-sub{font-size:10.5px;font-weight:700;color:#9aa1ab;margin:2px 0 10px}
+.tscroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:11.5px}
+th{font-size:9.5px;font-weight:900;text-transform:uppercase;letter-spacing:.03em;color:#8a919c;
+  text-align:right;padding:6px 8px;border-bottom:2px solid #e7e9ec;white-space:nowrap}
+th.l,td.l{text-align:left}
+td{padding:5px 8px;border-bottom:1px solid #f0f1f3;text-align:right;font-weight:700;white-space:nowrap}
+tr:hover td{background:#f7f9fc}
+tr.tot td{border-top:2px solid #111;border-bottom:0;font-weight:900;background:#f5f6f8}
+td.imm{color:#9aa1ab;font-style:italic}
+td.cur{background:#fbfceb}
+.cell-good{color:#15803d}.cell-mid{color:#b45309}.cell-bad{color:#b42318}
+.chip{display:inline-block;font-size:9px;font-weight:800;border-radius:5px;padding:2px 6px;background:#e7e9ec;color:#555}
+.chip.recall{background:#fdeaea;color:#b42318}
+.chip.finish{background:#fef3e2;color:#b45309}
+
+.footer{margin-top:4px;font-size:11px;font-weight:600;color:#999;line-height:1.6}
+.footer b{color:#777}
+.empty{padding:40px 0;text-align:center;font-size:15px;font-weight:800;color:#999}
+@media(max-width:1400px){.kpis{grid-template-columns:repeat(4,1fr)}.panels{grid-template-columns:1fr 1fr}}
+@media(max-width:900px){.panels{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:700px){.kpis{grid-template-columns:1fr 1fr}.big-title{font-size:26px}}
+@media(max-width:480px){
+  .wrap{padding:10px 10px 20px}
+  .big-title{font-size:22px}
+  .big-title small{display:block;margin-left:0;margin-top:3px}
+  .tabs{margin-left:0}
+  .kpi .v{font-size:22px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="big-title">INSTALL CALLBACKS<small id="t-sub">HVAC INSTALL · COMBINED</small></div>
+    <div class="tabs" id="tabs"></div>
+  </div>
+  <div id="board"><div class="empty">Waiting for data…</div></div>
+  <div class="footer" id="foot"></div>
+</div>
+<script>
+"use strict";
+const RELOAD_MINS = 5;
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+let DATA = null, cur = "combined";
+
+const $ = id => document.getElementById(id);
+const pctc = v => v <= 10 ? "cell-good" : v <= 25 ? "cell-mid" : "cell-bad";
+const mLabel = k => MONTHS[parseInt(k.slice(5),10)-1] + " " + k.slice(2,4);
+
+function kpisHtml(b) {
+  const k = b.kpis;
+  return `<div class="kpis">
+    <div class="kpi hero"><div class="v">${k.rate180.toFixed(1)}%</div><div class="k">180-day callback rate</div>
+      <div class="s">installs we went back to within 180 days &middot; final cohorts only (${k.rate180Installs} installs)</div></div>
+    <div class="kpi"><div class="v ${pctc(k.rate30)}">${k.rate30.toFixed(1)}%</div><div class="k">Within 30 days</div>
+      <div class="s">last 6 final cohorts</div></div>
+    <div class="kpi"><div class="v ${pctc(k.rate90)}">${k.rate90.toFixed(1)}%</div><div class="k">Within 90 days</div>
+      <div class="s">last 6 final cohorts</div></div>
+    <div class="kpi"><div class="v">${k.visitsPer100.toFixed(0)}</div><div class="k">Return trips / 100 installs</div>
+      <div class="s">${k.visitsYr} callback visits in the last 12 months</div></div>
+    <div class="kpi"><div class="v">${k.mtdVisits}</div><div class="k">Callback visits MTD</div>
+      <div class="s">${k.mtdRecall} recall &middot; ${k.mtdFinish} finish &middot; ${k.mtdInstalls} installs</div></div>
+    <div class="kpi"><div class="v">${k.openCallbacks == null ? "—" : k.openCallbacks}</div><div class="k">Open callbacks now</div>
+      <div class="s">booked, not yet completed</div></div>
+    <div class="kpi"><div class="v">${k.medianGap}<span style="font-size:14px"> days</span></div><div class="k">Median time to callback</div>
+      <div class="s">from install completion, last 12 months</div></div>
+    <div class="kpi"><div class="v">${k.recallShare.toFixed(0)}%</div><div class="k">Recall share</div>
+      <div class="s">rest is finish / startup work</div></div>
+  </div>`;
+}
+
+/* cumulative callback curve: % of installs called back by day N */
+function curveHtml(b) {
+  const c = b.curve;
+  if (!c || !c.installs) return `<div class="panel"><div class="p-title">Callback timing curve</div><div class="empty">Not enough aged installs yet</div></div>`;
+  const W = 560, H = 210, P = 34;
+  const pts = c.byDay.map(v => v / c.installs * 100);
+  const top = Math.max(Math.ceil(Math.max(...pts) / 5) * 5, 5);
+  const x = d => P + d / 180 * (W - P - 10);
+  const y = v => H - 22 - v / top * (H - 40);
+  const line = pts.map((v,d) => `${d?"L":"M"}${x(d).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  const grid = [];
+  for (let g = 0; g <= top; g += top > 20 ? 10 : 5)
+    grid.push(`<line x1="${P}" y1="${y(g)}" x2="${W-10}" y2="${y(g)}" stroke="#eef0f3"/>
+      <text x="${P-5}" y="${y(g)+3}" font-size="9" font-weight="700" fill="#9aa1ab" text-anchor="end">${g}%</text>`);
+  const marks = [30,60,90,180].map(d =>
+    `<line x1="${x(d)}" y1="${y(0)}" x2="${x(d)}" y2="${y(pts[d])}" stroke="#e7e9ec" stroke-dasharray="3,3"/>
+     <circle cx="${x(d)}" cy="${y(pts[d])}" r="3.5" fill="#111827"/>
+     <text x="${x(d)}" y="${y(pts[d])-7}" font-size="10" font-weight="900" fill="#111" text-anchor="middle">${pts[d].toFixed(1)}%</text>
+     <text x="${x(d)}" y="${H-8}" font-size="9" font-weight="700" fill="#9aa1ab" text-anchor="middle">${d}d</text>`).join("");
+  return `<div class="panel">
+    <div class="p-title">Callback timing curve</div>
+    <div class="p-sub">of ${c.installs.toLocaleString()} installs at least 180 days old, the share we had gone back to by day N after install</div>
+    <div class="sline"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+      ${grid.join("")}
+      <path d="${line} L${x(180)},${y(0)} L${x(0)},${y(0)} Z" fill="#11182710"/>
+      <path d="${line}" fill="none" stroke="#111827" stroke-width="2.5"/>
+      ${marks}
+    </svg></div>
+  </div>`;
+}
+
+/* monthly workload: stacked recall/finish bars + trips-per-100 line */
+function monthlyHtml(b) {
+  const ms = b.monthly;
+  if (!ms.length) return "";
+  const W = 560, H = 210, P = 30;
+  const maxV = Math.max(...ms.map(m => m.visits), 1);
+  const rates = ms.map(m => m.per100).filter(v => v != null);
+  const maxR = Math.max(...rates, 1);
+  const bw = (W - P - 8) / ms.length;
+  const y = v => H - 26 - v / maxV * (H - 60);
+  const yr = v => H - 26 - v / maxR * (H - 60);
+  const bars = ms.map((m,i) => {
+    const x0 = P + i * bw + 2;
+    const hR = (H - 26) - y(m.recall), hF = (H - 26) - y(m.finish + m.recall);
+    return `<rect x="${x0}" y="${y(m.recall)}" width="${bw-4}" height="${Math.max(hR,0)}" fill="#b42318" rx="2"/>
+      <rect x="${x0}" y="${y(m.recall + m.finish)}" width="${bw-4}" height="${Math.max(y(m.recall)-y(m.recall+m.finish),0)}" fill="#e0a421" rx="2"/>
+      <text x="${x0+(bw-4)/2}" y="${y(m.visits)-4}" font-size="8.5" font-weight="800" fill="#555" text-anchor="middle">${m.visits||""}</text>
+      ${i % 2 === (ms.length % 2 ? 0 : 1) ? `<text x="${x0+(bw-4)/2}" y="${H-14}" font-size="8" font-weight="700" fill="#9aa1ab" text-anchor="middle">${mLabel(m.month)}</text>` : ""}`;
+  }).join("");
+  const lp = ms.map((m,i) => m.per100 == null ? null :
+      `${P + i * bw + bw/2},${yr(m.per100).toFixed(1)}`).filter(Boolean);
+  const line = lp.length > 1 ? `<polyline points="${lp.join(" ")}" fill="none" stroke="#111827" stroke-width="2" stroke-dasharray="5,3"/>` : "";
+  const last = ms.filter(m => m.per100 != null).slice(-1)[0];
+  return `<div class="panel">
+    <div class="p-title">Callback workload by month</div>
+    <div class="p-sub"><span style="color:#b42318">&#9632;</span> recall &nbsp;<span style="color:#e0a421">&#9632;</span> finish visits completed &middot; dashed line = trips per 100 recent installs${last ? " (now " + last.per100.toFixed(0) + ")" : ""}</div>
+    <div class="sline"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${bars}${line}</svg></div>
+  </div>`;
+}
+
+function histHtml(b) {
+  const order = ["0-7","8-30","31-60","61-90","91-180","180+"];
+  const cols = {"0-7":"#b42318","8-30":"#d9541e","31-60":"#e0a421","61-90":"#8a919c","91-180":"#64748b","180+":"#334155"};
+  const max = Math.max(...order.map(k => b.hist[k] || 0), 1);
+  const total = order.reduce((s,k) => s + (b.hist[k] || 0), 0) || 1;
+  return `<div class="panel">
+    <div class="p-title">When callbacks land</div>
+    <div class="p-sub">days between install completion and the return visit &middot; all linked callbacks in the window</div>
+    <div class="seglist">${order.map(k => `
+      <div class="segrow"><span class="sn">${k} days</span>
+        <span class="track"><span class="fill" style="width:${(b.hist[k]||0)/max*100}%;background:${cols[k]}"></span></span>
+        <span class="gmn">${((b.hist[k]||0)/total*100).toFixed(0)}%</span>
+        <span class="sub">${(b.hist[k]||0).toLocaleString()}</span></div>`).join("")}</div>
+  </div>`;
+}
+
+function cohortHtml(b) {
+  const rows = b.cohorts.filter(r => r.installs || r.visits);
+  const wins = DATA.windows;
+  const curKey = DATA.today.slice(0,7);
+  const body = rows.map(r => {
+    const cells = wins.map(w => {
+      const v = r.installs ? r[`u${w}`] / r.installs * 100 : 0;
+      const mature = r.mature[String(w)];
+      return `<td class="${mature ? pctc(v) : "imm"}" title="${r[`u${w}`]} of ${r.installs} installs${mature ? "" : " — cohort still aging, not final"}">${v.toFixed(1)}%${mature ? "" : " …"}</td>`;
+    }).join("");
+    return `<tr>
+      <td class="l ${r.month===curKey?"cur":""}">${mLabel(r.month)}${r.month===curKey?" (MTD)":""}</td>
+      <td>${r.installs.toLocaleString()}</td>${cells}
+      <td>${r.visits}</td><td>${r.recall}</td><td>${r.finish}</td>
+      <td>${r.installs ? (r.visits/r.installs).toFixed(2) : "—"}</td></tr>`;
+  }).join("");
+  const t = rows.reduce((a,r) => { for (const k of ["installs","visits","recall","finish"]) a[k]+=r[k]; return a; }, {installs:0,visits:0,recall:0,finish:0});
+  return `<div class="tablecard">
+    <div class="t-title">Install cohorts — callback rate by age window</div>
+    <div class="t-sub">each row = installs completed that month &middot; %-columns = share of those installs we returned to within 30/60/90/180 days &middot; <i>italic …</i> = window not complete yet, running value shown &middot; visits count every return trip (an install can have several)</div>
+    <div class="tscroll"><table>
+      <tr><th class="l">Install month</th><th>Installs</th>${wins.map(w=>`<th>&le;${w}d</th>`).join("")}
+      <th>Return visits</th><th>Recall</th><th>Finish</th><th>Trips / install</th></tr>
+      ${body}
+      <tr class="tot"><td class="l">Total</td><td>${t.installs.toLocaleString()}</td>
+      <td colspan="${wins.length}"></td><td>${t.visits}</td><td>${t.recall}</td><td>${t.finish}</td>
+      <td>${t.installs ? (t.visits/t.installs).toFixed(2) : "—"}</td></tr>
+    </table></div>
+  </div>`;
+}
+
+function recentHtml(b) {
+  const rows = b.recent || [];
+  if (!rows.length) return "";
+  return `<div class="tablecard">
+    <div class="t-title">Recent callback visits</div>
+    <div class="t-sub">latest ${rows.length} completed recall / finish jobs in the install department</div>
+    <div class="tscroll"><table>
+      <tr><th class="l">Completed</th>${cur==="combined"?'<th class="l">Company</th>':""}<th class="l">Job type</th><th class="l">Category</th><th>Days after install</th><th>Install month</th></tr>
+      ${rows.map(r => `<tr>
+        <td class="l">${r.date || "—"}</td>
+        ${cur==="combined"?`<td class="l">${r.co || ""}</td>`:""}
+        <td class="l">${r.type}</td>
+        <td class="l"><span class="chip ${r.cat}">${r.cat}</span></td>
+        <td>${r.gap != null ? r.gap : "—"}</td>
+        <td>${r.om ? mLabel(r.om) : "—"}</td></tr>`).join("")}
+    </table></div>
+  </div>`;
+}
+
+function render() {
+  if (!DATA) return;
+  const b = DATA.boards[cur];
+  const label = cur === "combined" ? "COMBINED" : DATA.companies[cur].label.toUpperCase();
+  $("t-sub").textContent = "HVAC INSTALL · " + label;
+  $("board").innerHTML = kpisHtml(b)
+    + `<div class="panels">${curveHtml(b)}${monthlyHtml(b)}${histHtml(b)}</div>`
+    + cohortHtml(b) + recentHtml(b);
+  $("foot").innerHTML = `<b>Definitions:</b> installs = completed, revenue-bearing jobs in the HVAC install business unit.
+    Callbacks = completed Recall/Warranty-type jobs (recall) plus Retro Finish / Startup / Client Resolution jobs (finish) in the same department,
+    linked to the original install by recall link &rarr; project &rarr; location. <b>Excluded entirely:</b> Quality Assurance, QA crew checks and drywall visits (planned post-install work), and canceled callbacks.
+    A cohort's 30/60/90/180-day cell is final only once every install in it has had that long to fail — italic cells are still aging.
+    Early-2025 cohorts may undercount at Sierra/Ultimate if recall job types weren't yet in consistent use.
+    &nbsp;·&nbsp; Updated ${DATA.updated}${DATA.complete ? "" : " · <span style='color:#b45309'>backfill in progress — some closed months still computing</span>"}`;
+}
+
+function tabsHtml() {
+  const t = [["combined","Combined"], ...Object.entries(DATA.companies).map(([k,c]) => [k, c.label])];
+  $("tabs").innerHTML = t.map(([k,l]) =>
+    `<div class="tab ${k===cur?"on":""}" onclick="pick('${k}')">${l}</div>`).join("");
+}
+
+function pick(k) { cur = k; tabsHtml(); render(); }
+
+async function load() {
+  try {
+    const r = await fetch("data.json?ts=" + Date.now());
+    DATA = await r.json();
+    tabsHtml(); render();
+  } catch (e) {
+    $("board").innerHTML = `<div class="empty">Could not load data.json — ${e}</div>`;
+  }
+}
+load();
+setInterval(load, RELOAD_MINS * 60 * 1000);
+</script>
+</body>
+</html>
