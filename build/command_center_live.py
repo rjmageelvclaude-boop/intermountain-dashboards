@@ -24,7 +24,8 @@ Metric definitions (validated against the old report-based feed):
   - installs          = real system installs on the board, split HVAC/plumbing
                         (install-BU jobs with an "Install ..." type; part installs,
                         recalls, QA, drywall, finish jobs excluded); same-day =
-                        install job also CREATED that day (sold + installed same day)
+                        estimate SOLD that day on the install's project (location
+                        for Brothers) + install job created that day
   - install callbacks = return trips ON TODAY'S BOARD to a location with an
                         install completed in the last 90 days - installs AND the
                         return trips count in any department (service techs run
@@ -500,17 +501,6 @@ def compute_day(company, day, jt_names=None):
     m["tglsSetSameDay"] = sum(1 for j in tgl_created if j["id"] in jobs_by_id)
     m["tglsCanceled"] = sum(1 for j in tgl_created if j.get("jobStatus") == "Canceled")
 
-    # -- same-day installs: an install job on today's board that was also CREATED
-    # today. Install jobs are booked when the sale closes, so created-today +
-    # installing-today = sold and installed the same day.
-    created_ids = {j["id"] for j in created}
-    m["hvacInstallsSameDay"] = count(
-        lambda j: live(j) and inst(j, "hvac_install") and j["id"] in created_ids)
-    m["plumbInstallsSameDay"] = count(
-        lambda j: live(j) and inst(j, "plumb_install") and j["id"] in created_ids)
-    m["elecInstallsSameDay"] = count(
-        lambda j: live(j) and inst(j, "elec_install") and j["id"] in created_ids)
-
     # -- estimates sold today
     estimates = fetch_all(tenant, "/sales/v2/tenant/{tenant}/estimates",
                           {"soldAfter": start, "soldBefore": end}, page_size=500)
@@ -519,6 +509,34 @@ def compute_day(company, day, jt_names=None):
         for j in fetch_all(tenant, "/jpm/v2/tenant/{tenant}/jobs",
                            {"ids": ",".join(map(str, missing[i:i + 50]))}):
             jobs_by_id[j["id"]] = decorate(j)
+
+    # -- same-day installs: SOLD today and installing today (RJ 2026-07-15;
+    # the old created-today-only test mislabeled late-evening sales whose
+    # install job was booked after midnight). Sold today = an estimate sold
+    # today on the install's project - the estimate lives on the sales/service
+    # job, so the project is the link; Brothers doesn't put installs on
+    # projects, so it falls back to a same-location match. The job must also
+    # be CREATED today so an add-on estimate sold onto last week's project
+    # doesn't relabel an already-booked install.
+    sold_projects, sold_locations = set(), set()
+    for e in estimates:
+        ej = jobs_by_id.get(e.get("jobId"))
+        if ej:
+            if ej.get("projectId"):
+                sold_projects.add(ej["projectId"])
+            if ej.get("locationId"):
+                sold_locations.add(ej["locationId"])
+    created_ids = {j["id"] for j in created}
+    same_day = lambda j: (j["id"] in created_ids
+                          and (j["projectId"] in sold_projects if j.get("projectId")
+                               else j.get("locationId") in sold_locations))
+    m["hvacInstallsSameDay"] = count(
+        lambda j: live(j) and inst(j, "hvac_install") and same_day(j))
+    m["plumbInstallsSameDay"] = count(
+        lambda j: live(j) and inst(j, "plumb_install") and same_day(j))
+    m["elecInstallsSameDay"] = count(
+        lambda j: live(j) and inst(j, "elec_install") and same_day(j))
+    m["sameDayDef"] = 2  # history recompute marker - definition changed 2026-07-15
 
     # an estimate can be sold today on an older sales job that never touched
     # today's board - classify those turnover-or-marketed too
@@ -898,16 +916,16 @@ def read_history():
 def compute_history(progress=None):
     """Past-weekday metrics per company, cached on disk (past days never change).
 
-    Entries missing hvacOptionsPerOpp predate the options/membership-rate
-    metrics (2026-07-14) and are recomputed once so the sparklines don't mix
-    definitions.
+    Entries missing sameDayDef=2 predate the sold-today same-day-install
+    definition (2026-07-15) and are recomputed once so the sparklines don't
+    mix definitions.
     """
     cache = _load_json(HISTORY_FILE, {})
     out = {}
     for company, co in COMPANIES.items():
         jt = None
         entries = {e["date"]: e for e in cache.get(company, [])
-                   if "hvacOptionsPerOpp" in e}
+                   if e.get("sameDayDef") == 2}
         result = []
         for day in _history_days(co["tz"]):
             key = day.isoformat()
