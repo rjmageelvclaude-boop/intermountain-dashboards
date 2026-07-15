@@ -184,6 +184,13 @@ def _is_install_anchor(bucket, jt_name):
             and not re.search(r"\bpart\b", jt_name, re.I))
 
 
+def _trade(bucket):
+    """Trade prefix of a BU bucket: hvac / plumb / elec / excav (None if unmapped).
+    Callbacks are trade-matched (RJ 2026-07-14): an HVAC call only counts against
+    an HVAC install, a plumbing call only against a plumbing install."""
+    return bucket.split("_")[0] if bucket else None
+
+
 # ---------------------------------------------------------------- timezones
 def _us_dst_bounds(year):
     """(start, end) of US daylight saving time: 2nd Sunday of March 2am -> 1st Sunday of Nov 2am."""
@@ -444,6 +451,10 @@ def compute_day(company, day, jt_names=None):
 
     m["hvacSMCanceled"] = count(lambda j: j["_bucket"] in HVAC_SERVICE and j.get("jobStatus") == "Canceled")
     m["hvacSalesCanceled"] = count(lambda j: j["_bucket"] == "hvac_sales" and j.get("jobStatus") == "Canceled")
+    # job list feeds the canceled-estimate alarm overlay (job numbers only - data.json is public)
+    m["hvacSalesCanceledJobs"] = [
+        {"jobNumber": str(j.get("jobNumber") or j["id"]), "type": j["_jt_name"]}
+        for j in board if j["_bucket"] == "hvac_sales" and j.get("jobStatus") == "Canceled"]
     m["plumbCanceled"] = count(lambda j: (j["_bucket"] or "").startswith("plumb") and j.get("jobStatus") == "Canceled")
     m["elecCanceled"] = count(lambda j: (j["_bucket"] or "").startswith("elec") and j.get("jobStatus") == "Canceled")
     m["excavCanceled"] = count(lambda j: j["_bucket"] in EXCAV_ALL and j.get("jobStatus") == "Canceled")
@@ -678,19 +689,31 @@ def _local_date_str(ts, tz):
     return (t + dt.timedelta(hours=_utc_offset_hours(tz, t.date()))).date().isoformat()
 
 
+def _local_dt_str(ts, tz):
+    """Tenant-local timestamp 'YYYY-MM-DDTHH:MM' from a ServiceTitan UTC timestamp."""
+    if not ts:
+        return None
+    t = dt.datetime.strptime(ts[:19], "%Y-%m-%dT%H:%M:%S")
+    return (t + dt.timedelta(hours=_utc_offset_hours(tz, t.date()))).strftime("%Y-%m-%dT%H:%M")
+
+
 def compute_install_callbacks(company):
     """Install callbacks ON TODAY'S BOARD (RJ 2026-07-12: only today's returns).
 
     Anchor installs = install jobs in any mapped BU except HVAC Sales
     (_is_install_anchor) completed in the last CALLBACK_LOOKBACK_DAYS - the
     service departments run installs and callbacks too. A return trip = any job
-    in any department at the same location created AFTER the install completed -
-    excluding expected follow-ups (_CALLBACK_EXEMPT: drywall/QA/permit/finish/
-    startup), canceled jobs, sales-BU estimate visits (a recall booked in the
-    sales BU still counts), and other installs (a new purchase isn't a callback).
-    Listed rows are return trips with an appointment TODAY; `trips` = total
-    times back since the install (today included); >2 = CODE PINK (the board
-    blinks). Current-state only - not part of per-day history.
+    in the SAME TRADE (RJ 2026-07-14: HVAC calls only match HVAC installs,
+    plumbing calls only plumbing installs - bucket prefix via _trade) at the
+    same location created AFTER the install completed - excluding expected
+    follow-ups (_CALLBACK_EXEMPT: drywall/QA/permit/finish/startup), canceled
+    jobs, sales-BU estimate visits (a recall booked in the sales BU still
+    counts), and other installs (a new purchase isn't a callback).
+    Listed rows are return trips with an appointment TODAY, sorted by when the
+    callback job was CREATED (oldest first - the frontend numbers them so the
+    team can spot a new arrival); `trips` = total times back since the install
+    (today included); >2 = CODE PINK (the board blinks). Current-state only -
+    not part of per-day history.
     """
     co = COMPANIES[company]
     tenant = co["tenant"]
@@ -715,6 +738,7 @@ def compute_install_callbacks(company):
         name = jtname(j)
         return (j["id"] != install["id"] and j.get("jobStatus") != "Canceled"
                 and (j.get("createdOn") or "") > (install.get("completedOn") or "")
+                and _trade(bucket(j)) == _trade(bucket(install))  # HVAC calls <-> HVAC installs only
                 and not _is_install_anchor(bucket(j), name)  # a new purchase isn't a callback
                 # sales-BU estimate visits don't count, but a recall booked there does
                 and (not (bucket(j) or "").endswith("_sales")
@@ -739,7 +763,8 @@ def compute_install_callbacks(company):
             continue
         seen.add(j["id"])
         candidates = [i for i in installs_by_loc.get(j["locationId"], [])
-                      if (j.get("createdOn") or "") > (i.get("completedOn") or "")]
+                      if (j.get("createdOn") or "") > (i.get("completedOn") or "")
+                      and _trade(bucket(i)) == _trade(bucket(j))]
         if not candidates:
             continue
         install = max(candidates, key=lambda i: i.get("completedOn") or "")
@@ -751,6 +776,7 @@ def compute_install_callbacks(company):
         rows.append({"jobNumber": str(j.get("jobNumber") or j["id"]),
                      "type": jtname(j),
                      "status": j.get("jobStatus"),
+                     "createdOn": _local_dt_str(j.get("createdOn"), tz),
                      "installJobNumber": str(install.get("jobNumber") or install["id"]),
                      "installType": jtname(install),
                      "installedOn": _local_date_str(install.get("completedOn"), tz),
@@ -760,7 +786,9 @@ def compute_install_callbacks(company):
                                   "day": _local_date_str(t.get("createdOn"), tz)}
                                  for t in trips],
                      "codePink": len(trips) > 2})
-    rows.sort(key=lambda r: (-r["trips"], r["installedOn"] or ""))
+    # arrival order (oldest first) - the frontend numbers rows 1..N so the crew
+    # can tell at a glance when a NEW callback lands (it appends at the bottom)
+    rows.sort(key=lambda r: r["createdOn"] or "")
     return {"installCallbacksToday": rows,
             "installCallbackAlerts": sum(1 for r in rows if r["codePink"]),
             "installCallbackWindowDays": CALLBACK_LOOKBACK_DAYS}
