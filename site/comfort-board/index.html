@@ -649,12 +649,10 @@ function renderDispatch(){
   var tot={opps:0,set:0,canc:0,ran:0,sold:0,sales:0};
   rows.forEach(function(r){Object.keys(tot).forEach(function(k){tot[k]+=r[k]})});
   function cancelTd(canc,set){
-    if(!set)return'<td><span class="dash">&mdash;</span></td>';
-    var v=canc/set;
-    return'<td'+(v>=.5?' style="background:var(--bad-bg);color:var(--bad)"':'')+'>'+Math.round(v*100)+'%</td>';
+    return'<td>'+pct(canc,set)+'</td>';
   }
   function perOppTd(sales,opps){
-    return'<td style="background:var(--good-bg);color:var(--good);font-weight:800">'+(opps?fmt$(sales/opps):'<span class="dash">&mdash;</span>')+'</td>';
+    return'<td style="font-weight:800">'+(opps?fmt$(sales/opps):'<span class="dash">&mdash;</span>')+'</td>';
   }
   var body=rows.map(function(r){
     return'<tr><td>'+rankChip(r.rank)+'</td>'+
@@ -688,7 +686,7 @@ function renderDispatch(){
     hth("opps","Opps Given")+hth("set","TGLs Set")+hth("tglPct","TGL %")+
     hth("ran","TGLs Ran")+hth("canc","TGLs Canc.")+hth("cancelRate","Cancel Rate")+
     hth("netPct","Net TGL %")+hth("sold","TGLs Sold")+hth("sales","TGL Sales")+
-    hth("conv","C/A Conv. Rate")+hth("perOpp","Sales per Opp",' style="background:var(--good-bg)"')+'</tr>';
+    hth("conv","C/A Conv. Rate")+hth("perOpp","Sales per Opp")+'</tr>';
   var defs='<div class="defs">'+
     '<div><b>Opps Given</b> &mdash; completed service calls carrying the ROPP tag (net of Management Removed): the replacement opportunities the tech was handed.</div>'+
     '<div><b>TGLs Set</b> &mdash; turnovers the tech generated, day of creation, including ones later canceled &middot; <b>TGL %</b> = TGLs set &divide; opps given &middot; <b>Cancel Rate</b> = TGLs canceled &divide; TGLs set &middot; <b>Net TGL %</b> = TGLs ran &divide; opps given.</div>'+
