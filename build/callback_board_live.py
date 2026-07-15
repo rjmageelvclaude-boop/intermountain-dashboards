@@ -357,15 +357,27 @@ def aggregate(months, today):
     }
 
 
-def _merge_months(all_months):
-    """Merge several companies' month dicts into one 'combined' dict."""
+def _merge_months(named_months):
+    """Merge {company: months} into one 'combined' months dict.
+
+    Job/project/location ids are per-tenant numeric sequences that can
+    collide across tenants, so every id is namespaced with the company -
+    otherwise a callback could link to another company's install.
+    """
     out = {}
-    for months in all_months:
+    for company, months in named_months.items():
+        def ns(v):
+            return f"{company}:{v}" if v is not None else None
         for k, ev in months.items():
             tgt = out.setdefault(k, {"installs": [], "callbacks": [],
                                      "qa": 0, "drywall": 0})
-            tgt["installs"].extend(ev["installs"])
-            tgt["callbacks"].extend(ev["callbacks"])
+            tgt["installs"].extend(dict(i, i=ns(i["i"]), loc=ns(i["loc"]),
+                                        proj=ns(i.get("proj")))
+                                   for i in ev["installs"])
+            tgt["callbacks"].extend(dict(c, i=ns(c["i"]), loc=ns(c["loc"]),
+                                         proj=ns(c.get("proj")),
+                                         rf=ns(c.get("rf")))
+                                    for c in ev["callbacks"])
             tgt["qa"] += ev["qa"]
             tgt["drywall"] += ev["drywall"]
     return out
@@ -419,10 +431,10 @@ def compute(time_budget_secs=None, progress=None):
     results = map_companies(one, COMPANIES)
     today = local_today("pacific")
     boards, complete = {}, True
-    month_sets, open_total = [], 0
+    month_sets, open_total = {}, 0
     for company, (months, ok, open_cb) in results.items():
         complete = complete and ok
-        month_sets.append(months)
+        month_sets[company] = months
         open_total += open_cb or 0
         agg = aggregate(months, today)
         for r in agg["recent"]:
