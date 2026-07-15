@@ -596,6 +596,7 @@ def compute_day(company, day, jt_names=None):
                          {"invoicedOnOrAfter": day_s, "invoicedOnBefore": day_e}, page_size=500)
     daily_rev = hvac_service_rev = plumb_rev = elec_rev = excav_rev = 0.0
     memb = {"hvac": 0, "plumb": 0, "elec": 0}
+    memb_inv_jobs = set()  # jobs whose invoice today carries a membership line
     for inv in invoices:
         sub = float(inv.get("subTotal") or 0)
         daily_rev += sub
@@ -615,6 +616,9 @@ def compute_day(company, day, jt_names=None):
             pre = (bucket or "")
             memb["plumb" if pre.startswith("plumb")
                   else "elec" if pre.startswith(("elec", "excav")) else "hvac"] += 1
+            jid = (inv.get("job") or {}).get("id")
+            if jid:
+                memb_inv_jobs.add(jid)
     m["dailyRevenue"] = round(daily_rev, 2)
     m["hvacServiceRevenue"] = round(hvac_service_rev, 2)
     m["plumbRevenue"] = round(plumb_rev, 2)
@@ -623,6 +627,65 @@ def compute_day(company, day, jt_names=None):
     m["hvacMembershipsSold"] = memb["hvac"]
     m["plumbMembershipsSold"] = memb["plumb"]
     m["elecMembershipsSold"] = memb["elec"]
+
+    # -- options per opportunity + membership conversion / offer rate for the
+    # two service trades (RJ 2026-07-14). Opportunity = the call-board formula
+    # (not noCharge, or job total >= the job type's soldThreshold). Options =
+    # estimates CREATED today on opportunity jobs completed today (a dismissed
+    # estimate was still presented). Non-member = the job's customer had no
+    # membership active before today (one starting today was sold on this
+    # visit, so the job stays in the denominator - tech-board definition).
+    # Conversion = non-member jobs where a membership was SOLD on the job
+    # (today's invoice carries a membership line, or a membership SKU is on an
+    # estimate sold today); offer rate adds jobs where any estimate created
+    # today carries a membership SKU. Imports the tech-board helpers at call
+    # time (tech_board_live imports this module, so top-level would be circular)
+    # to keep SKU patterns and thresholds in one place.
+    from tech_board_live import (DEFAULT_SOLD_THRESHOLD, sold_thresholds,
+                                 _memberships_for_customers, _member_before,
+                                 _is_memb_sku)
+    thresholds = sold_thresholds(tenant)
+    ests_on_job, sold_on_job = {}, {}
+    for e in fetch_all(tenant, "/sales/v2/tenant/{tenant}/estimates",
+                       {"createdOnOrAfter": start, "createdBefore": end},
+                       page_size=500):
+        if e.get("jobId"):
+            ests_on_job.setdefault(e["jobId"], []).append(e)
+    for e in estimates:
+        if e.get("jobId"):
+            sold_on_job.setdefault(e["jobId"], []).append(e)
+
+    def memb_on(e):
+        return any(_is_memb_sku(company, (it.get("sku") or {}).get("name"))
+                   for it in (e.get("items") or []))
+
+    svc_done = {t: [j for j in board if j["_bucket"] in bks and ran(j)]
+                for t, bks in (("hvac", HVAC_SERVICE), ("plumb", PLUMB_SERVICE))}
+    memberships = _memberships_for_customers(
+        tenant, {j["customerId"] for js in svc_done.values() for j in js
+                 if j.get("customerId")})
+    day_iso = day.isoformat()
+    for trade, js in svc_done.items():
+        opps = options = non_member = nm_sold = nm_off = 0
+        for j in js:
+            total = float(j.get("total") or 0)
+            thr = thresholds.get(j.get("jobTypeId"), DEFAULT_SOLD_THRESHOLD)
+            if (not j.get("noCharge")) or total >= thr:
+                opps += 1
+                options += len(ests_on_job.get(j["id"], ()))
+            cid = j.get("customerId")
+            if cid is not None and not _member_before(memberships, cid, day_iso):
+                non_member += 1
+                sold_m = (j["id"] in memb_inv_jobs
+                          or any(memb_on(e) for e in sold_on_job.get(j["id"], ())))
+                nm_sold += sold_m
+                nm_off += sold_m or any(memb_on(e) for e in ests_on_job.get(j["id"], ()))
+        m[trade + "SvcOpps"] = opps
+        m[trade + "OptionsPresented"] = options
+        m[trade + "OptionsPerOpp"] = round(options / opps, 2) if opps else 0
+        m[trade + "NonMemberJobs"] = non_member
+        m[trade + "MembConversion"] = round(nm_sold / non_member * 100, 1) if non_member else 0
+        m[trade + "MembOfferRate"] = round(nm_off / non_member * 100, 1) if non_member else 0
 
     # -- phones
     calls = fetch_all(tenant, "/telecom/v2/tenant/{tenant}/calls",
@@ -831,15 +894,16 @@ def read_history():
 def compute_history(progress=None):
     """Past-weekday metrics per company, cached on disk (past days never change).
 
-    Entries missing hvacInstallsSameDay predate the real-system-install metrics
-    (2026-07-12) and are recomputed once so the sparklines don't mix definitions.
+    Entries missing hvacOptionsPerOpp predate the options/membership-rate
+    metrics (2026-07-14) and are recomputed once so the sparklines don't mix
+    definitions.
     """
     cache = _load_json(HISTORY_FILE, {})
     out = {}
     for company, co in COMPANIES.items():
         jt = None
         entries = {e["date"]: e for e in cache.get(company, [])
-                   if "hvacInstallsSameDay" in e}
+                   if "hvacOptionsPerOpp" in e}
         result = []
         for day in _history_days(co["tz"]):
             key = day.isoformat()
