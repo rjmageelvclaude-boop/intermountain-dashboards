@@ -133,9 +133,10 @@ jobs:
           # Backfills at most current + 2 closed months per run; a cold cache
           # converges over ~3 runs. Steady state is ~90s.
           GM_BOARD_BUDGET: "420"
-          # Cold cache backfills 19 months x 4 tenants over a few runs;
+          # Cold cache backfills 19 months x 4 tenants over a few runs
+          # (months now also fetch crew assignments + appointment hours);
           # steady state only recomputes the current month + open callbacks.
-          CALLBACK_BOARD_BUDGET: "180"
+          CALLBACK_BOARD_BUDGET: "300"
           # Customer privacy: names ship only as an AES-256-GCM blob under
           # this passphrase, unlocked in the browser by the viewer;
           # unset -> the board publishes without customer names.
