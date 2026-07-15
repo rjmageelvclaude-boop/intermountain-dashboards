@@ -404,6 +404,14 @@ function renderScore(){
       '<div class="c-sub">'+pct(b.turnoverCancels,turns+b.turnoverCancels)+' of turns booked</div></div>'+
   '</div>';
 
+  // Estimate Sales: where each lead type lands at month end on the current
+  // pace (MTD sales / workdays elapsed x workdays in month), green/red vs plan
+  function estTd(actual,planRev){
+    if(!clock.elapsed)return'<td><span class="dash">&mdash;</span></td>';
+    var est=actual/clock.elapsed*clock.total;
+    var col=planRev!==null?' style="color:var(--'+(est>=planRev?'good':'bad')+');font-weight:800"':'';
+    return'<td'+col+'>'+fmt$(est)+'</td>';
+  }
   var rows="";
   typeCols().forEach(function(t){
     var k=t[0],a=m[k],e=p.types[k];
@@ -414,18 +422,18 @@ function renderScore(){
       '<td class="dim">'+(e.close!==null?e.close+"%":"&mdash;")+'</td>'+
       '<td class="dim">'+(e.avg!==null?fmt$(e.avg):"&mdash;")+'</td>'+
       '<td class="dim">'+(e.revenue!==null?fmt$(e.revenue):"&mdash;")+'</td>'+
-      '<td>'+(e.revenue!==null?chip(a.revenue-e.revenue,fmt$):'<span class="dash">&mdash;</span>')+'</td></tr>';
+      estTd(a.revenue,e.revenue)+'</tr>';
   });
   var t=m._total;
   rows+='<tr class="tot"><td>TOTAL</td><td>'+t.leads+'</td><td>'+t.sold+'</td><td>'+pct(t.sold,t.leads)+'</td>'+
     '<td>'+(t.sold?fmt$(t.revenue/t.sold):"&mdash;")+'</td><td>'+fmt$(t.revenue)+'</td>'+
     '<td class="grp dim"></td><td class="dim"></td><td class="dim"></td>'+
     '<td class="dim">'+(p.revenue!==null?fmt$(p.revenue):"&mdash;")+'</td>'+
-    '<td>'+(p.revenue!==null?chip(t.revenue-p.revenue,fmt$):'<span class="dash">&mdash;</span>')+'</td></tr>';
+    estTd(t.revenue,p.revenue)+'</tr>';
 
   var tbl='<div class="sect">Monthly Actuals vs Plan</div><div class="tbl-scroll"><table class="g"><thead><tr>'+
     '<th>Lead Type</th><th>Leads</th><th>Sold</th><th>Close</th><th>Avg Sale</th><th>Sales</th>'+
-    '<th class="grp">Plan Leads</th><th>Plan Close</th><th>Plan Avg</th><th>Plan Sales</th><th>Sales Var</th>'+
+    '<th class="grp">Plan Leads</th><th>Plan Close</th><th>Plan Avg</th><th>Plan Sales</th><th>Estimate Sales</th>'+
     '</tr></thead><tbody>'+rows+'</tbody></table></div>';
 
   // recent days with day-over-day arrows and revenue bars
@@ -471,7 +479,7 @@ function renderScore(){
     }).join("")+'</tbody></table></div></div>';
 
   document.getElementById("app").innerHTML=shell(cards+tbl+daily+'<div class="duo">'+advTbl+techTbl+'</div>',
-    "Plan comes from Monthly Setup &middot; pace clock = Mon&ndash;Sat work days"+(plan("workdays")!==null?" capped at "+plan("workdays")+" budgeted":""),false);
+    "Plan comes from Monthly Setup &middot; Estimate Sales = MTD sales &divide; workdays elapsed &times; workdays in month, green above plan / red below &middot; pace clock = Mon&ndash;Sat work days"+(plan("workdays")!==null?" capped at "+plan("workdays")+" budgeted":""),false);
 }
 
 // ── advisors: batting order per lead type ──
