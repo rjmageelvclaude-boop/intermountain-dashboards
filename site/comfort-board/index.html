@@ -87,6 +87,8 @@ table.g tbody tr:hover td{background:var(--tint)}
 table.g tbody tr:last-child td{border-bottom:none}
 table.g tr.tot td{background:var(--tint);font-weight:800;border-top:2px solid var(--tint2)}
 table.g .grp{border-left:1px solid var(--hair2)}
+table.g th.sortable{cursor:pointer;user-select:none}
+table.g th.sortable:hover{color:var(--ink)}
 table.g .dim{color:var(--faint)}
 .tt-turn{color:var(--c-turn)}.tt-mark{color:var(--c-mark)}.tt-cost{color:var(--c-cost)}.tt-self{color:var(--c-self)}
 .rankn{display:inline-block;min-width:22px;color:var(--faint);font-size:11.5px;font-weight:700}
@@ -173,6 +175,7 @@ let data=null,settings=JSON.parse(localStorage.getItem(LS_KEY)||"{}"),synced=fal
 let co=localStorage.getItem(CO_KEY);if(COS.indexOf(co)<0)co="sierra";
 let view=localStorage.getItem(VIEW_KEY);if(!VIEWS.some(function(v){return v[0]===view}))view="score";
 let day="mtd"; // "mtd" or "YYYY-MM-DD"
+let dispatchSort=null; // {key, dir} column sort on Tech Dispatch Order; null = batting order
 
 function applyTheme(t){document.documentElement.setAttribute("data-theme",t);localStorage.setItem(THEME_KEY,t)}
 applyTheme(localStorage.getItem(THEME_KEY)||(window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"));
@@ -620,40 +623,48 @@ function renderDispatch(){
     return{name:t.name,opps:opps,set:set,canc:t.canc||0,ran:ran,sold:sold,sales:sales,
            perOpp:opps?sales/opps:null};
   }).filter(function(r){return r.opps||r.set||r.sales});
+  // batting order (the rank medals) is always sales-per-opp with the
+  // small-sample rule, no matter how the table is currently sorted
   rows.sort(function(a,c){
     var am=a.opps>=MIN_DISPATCH_OPPS?1:0,cm=c.opps>=MIN_DISPATCH_OPPS?1:0;
     if(am!==cm)return cm-am;
     return(c.perOpp===null?-1:c.perOpp)-(a.perOpp===null?-1:a.perOpp);
   });
-  var pcts=rows.filter(function(r){return r.opps}).map(function(r){return r.set/r.opps});
-  var mn=Math.min.apply(null,pcts),mx=Math.max.apply(null,pcts);
+  rows.forEach(function(r,i){r.rank=i});
+  var GET={
+    name:function(r){return r.name.toLowerCase()},
+    opps:function(r){return r.opps},set:function(r){return r.set},
+    tglPct:function(r){return r.opps?r.set/r.opps:-1},
+    ran:function(r){return r.ran},canc:function(r){return r.canc},
+    cancelRate:function(r){return r.set?r.canc/r.set:-1},
+    netPct:function(r){return r.opps?r.ran/r.opps:-1},
+    sold:function(r){return r.sold},sales:function(r){return r.sales},
+    conv:function(r){return r.ran?r.sold/r.ran:-1},
+    perOpp:function(r){return r.perOpp===null?-1:r.perOpp},
+  };
+  if(dispatchSort&&GET[dispatchSort.key]){
+    var g=GET[dispatchSort.key],dir=dispatchSort.dir;
+    rows.sort(function(a,c){var x=g(a),y=g(c);return(x<y?-1:x>y?1:0)*dir||a.rank-c.rank});
+  }
   var tot={opps:0,set:0,canc:0,ran:0,sold:0,sales:0};
   rows.forEach(function(r){Object.keys(tot).forEach(function(k){tot[k]+=r[k]})});
-  function tglPctTd(set,opps){
-    if(!opps)return'<td><span class="dash">&mdash;</span></td>';
-    var v=set/opps,t=mx>mn?(v-mn)/(mx-mn):1;
-    return'<td style="background:hsla('+Math.round(55+t*75)+',60%,45%,.30)">'+Math.round(v*100)+'%</td>';
-  }
   function cancelTd(canc,set){
     if(!set)return'<td><span class="dash">&mdash;</span></td>';
     var v=canc/set;
     return'<td'+(v>=.5?' style="background:var(--bad-bg);color:var(--bad)"':'')+'>'+Math.round(v*100)+'%</td>';
   }
-  function netTd(ran,opps){
-    return'<td style="background:rgba(230,185,60,.35);font-weight:800">'+(opps?Math.round(ran/opps*100)+'%':'<span class="dash">&mdash;</span>')+'</td>';
-  }
   function perOppTd(sales,opps){
     return'<td style="background:var(--good-bg);color:var(--good);font-weight:800">'+(opps?fmt$(sales/opps):'<span class="dash">&mdash;</span>')+'</td>';
   }
-  var body=rows.map(function(r,i){
-    return'<tr><td>'+rankChip(i)+'</td>'+
+  var body=rows.map(function(r){
+    return'<tr><td>'+rankChip(r.rank)+'</td>'+
       '<td style="text-align:left">'+r.name+(r.opps<MIN_DISPATCH_OPPS?' <span class="dash" title="Fewer than '+MIN_DISPATCH_OPPS+' opps given - ranked last">*</span>':'')+'</td>'+
       '<td>'+PARTNER[co]+'</td>'+
       '<td>'+n0(r.opps)+'</td><td>'+n0(r.set)+'</td>'+
-      tglPctTd(r.set,r.opps)+
+      '<td>'+pct(r.set,r.opps)+'</td>'+
       '<td>'+n0(r.ran)+'</td><td>'+n0(r.canc)+'</td>'+
       cancelTd(r.canc,r.set)+
-      netTd(r.ran,r.opps)+
+      '<td>'+pct(r.ran,r.opps)+'</td>'+
       '<td>'+n0(r.sold)+'</td><td><b>'+fmt$0(r.sales)+'</b></td>'+
       '<td>'+pct(r.sold,r.ran)+'</td>'+
       perOppTd(r.sales,r.opps)+'</tr>';
@@ -663,13 +674,21 @@ function renderDispatch(){
     '<td>'+pct(tot.set,tot.opps)+'</td>'+
     '<td>'+tot.ran+'</td><td>'+tot.canc+'</td>'+
     '<td>'+pct(tot.canc,tot.set)+'</td>'+
-    netTd(tot.ran,tot.opps)+
+    '<td>'+pct(tot.ran,tot.opps)+'</td>'+
     '<td>'+tot.sold+'</td><td>'+fmt$(tot.sales)+'</td>'+
     '<td>'+pct(tot.sold,tot.ran)+'</td>'+
     perOppTd(tot.sales,tot.opps)+'</tr>';
-  var head='<tr><th>#</th><th>Tech</th><th>Partner</th><th>Opps Given</th><th>TGLs Set</th><th>TGL %</th>'+
-    '<th>TGLs Ran</th><th>TGLs Canc.</th><th>Cancel Rate</th><th style="background:rgba(230,185,60,.35)">Net TGL %</th>'+
-    '<th>TGLs Sold</th><th>TGL Sales</th><th>C/A Conv. Rate</th><th style="background:var(--good-bg)">Sales per Opp</th></tr>';
+  function hth(key,label,extra){
+    var on=dispatchSort&&dispatchSort.key===key;
+    var arrow=on?(dispatchSort.dir>0?" &#9650;":" &#9660;"):"";
+    return'<th class="sortable"'+(extra||'')+' onclick="dispSort(\''+key+'\')" title="Sort by '+label+'">'+label+arrow+'</th>';
+  }
+  var head='<tr><th class="sortable" onclick="dispSort(null)" title="Back to batting order">#'+(dispatchSort?'':' &#9660;')+'</th>'+
+    hth("name","Tech")+'<th>Partner</th>'+
+    hth("opps","Opps Given")+hth("set","TGLs Set")+hth("tglPct","TGL %")+
+    hth("ran","TGLs Ran")+hth("canc","TGLs Canc.")+hth("cancelRate","Cancel Rate")+
+    hth("netPct","Net TGL %")+hth("sold","TGLs Sold")+hth("sales","TGL Sales")+
+    hth("conv","C/A Conv. Rate")+hth("perOpp","Sales per Opp",' style="background:var(--good-bg)"')+'</tr>';
   var defs='<div class="defs">'+
     '<div><b>Opps Given</b> &mdash; completed service calls carrying the ROPP tag (net of Management Removed): the replacement opportunities the tech was handed.</div>'+
     '<div><b>TGLs Set</b> &mdash; turnovers the tech generated, day of creation, including ones later canceled &middot; <b>TGL %</b> = TGLs set &divide; opps given &middot; <b>Cancel Rate</b> = TGLs canceled &divide; TGLs set &middot; <b>Net TGL %</b> = TGLs ran &divide; opps given.</div>'+
@@ -767,6 +786,12 @@ function render(){
   else renderScore();
 }
 function setCo(c){co=c;localStorage.setItem(CO_KEY,c);render()}
+function dispSort(k){
+  if(k===null||k==="null")dispatchSort=null;
+  else if(dispatchSort&&dispatchSort.key===k)dispatchSort.dir*=-1;
+  else dispatchSort={key:k,dir:k==="name"?1:-1};
+  render();
+}
 function setView(v){view=v;localStorage.setItem(VIEW_KEY,v);render()}
 function setDay(d){day=d;render()}
 
