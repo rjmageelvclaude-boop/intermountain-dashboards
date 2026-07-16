@@ -79,25 +79,21 @@ td.cur{background:#fbfceb}
   .kpi .v{font-size:22px}
 }
 
-/* --- under construction overlay --- */
-.wrap{filter:grayscale(.55) opacity(.45);pointer-events:none;user-select:none}
-.uc-overlay{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;overflow:hidden;pointer-events:none}
-.uc-tape{transform:rotate(-8deg);width:140vw;background:repeating-linear-gradient(45deg,#facc15 0 40px,#111 40px 80px);padding:10px 0;box-shadow:0 10px 40px rgba(0,0,0,.35)}
-.uc-tape .uc-inner{background:#111;margin:10px 0;padding:18px 0;text-align:center}
-.uc-tape .uc-txt{font-size:clamp(22px,4.2vw,64px);font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#facc15;line-height:1.1;white-space:nowrap}
-.uc-tape .uc-sub{font-size:clamp(11px,1.4vw,16px);font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:#fff;margin-top:6px;padding:0 6vw}
+/* --- under construction header --- */
+.uc-bar{background:repeating-linear-gradient(45deg,#facc15 0 24px,#111 24px 48px);padding:5px;border-radius:10px;margin:0 0 12px}
+.uc-bar .uc-inner{background:#111;border-radius:6px;padding:9px 16px;display:flex;align-items:baseline;justify-content:center;gap:14px;flex-wrap:wrap;text-align:center}
+.uc-bar .uc-txt{font-size:17px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#facc15;white-space:nowrap}
+.uc-bar .uc-sub{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#fff}
 </style>
 </head>
 <body>
-<div class="uc-overlay">
-  <div class="uc-tape">
+<div class="wrap">
+  <div class="uc-bar">
     <div class="uc-inner">
-      <div class="uc-txt">&#128679; Under Construction &#128679;</div>
-      <div class="uc-sub">This board is being rebuilt &mdash; numbers below are not final</div>
+      <span class="uc-txt">&#128679; Under Construction</span>
+      <span class="uc-sub">definitions being finalized &mdash; numbers are not final</span>
     </div>
   </div>
-</div>
-<div class="wrap">
   <div class="topbar">
     <div class="big-title">INSTALL CALLBACKS<small id="t-sub">HVAC INSTALL · COMBINED</small></div>
     <div class="tabs" id="tabs"></div>
