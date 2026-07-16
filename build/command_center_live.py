@@ -791,12 +791,16 @@ def compute_mtd(company):
     Today is deliberately excluded - the dashboard pairs these with today's live
     numbers, and pacing runs on budgeted days completed (yesterday inclusive).
     Recomputed from scratch every run so late/retroactive postings are picked up.
+
+    Also emits mtdDailyRevenue - one {date, revenue} per calendar day (zero-filled,
+    weekends included) from the same invoice pull - for the MTD Trends chart.
     """
     co = COMPANIES[company]
     tenant = co["tenant"]
     today = local_today(co["tz"])
     if today.day == 1:
-        return {"mtdRevenue": 0.0, "mtdSales": 0.0, "mtdThrough": None}
+        return {"mtdRevenue": 0.0, "mtdSales": 0.0, "mtdThrough": None,
+                "mtdDailyRevenue": []}
     first = today.replace(day=1)
     yesterday = today - dt.timedelta(days=1)
 
@@ -807,6 +811,15 @@ def compute_mtd(company):
                          page_size=500, max_pages=100)
     mtd_rev = sum(float(inv.get("subTotal") or 0) for inv in invoices)
 
+    by_day = {}
+    for inv in invoices:
+        d = (inv.get("invoiceDate") or "")[:10]
+        if d:
+            by_day[d] = by_day.get(d, 0.0) + float(inv.get("subTotal") or 0)
+    daily = [{"date": (first + dt.timedelta(days=i)).isoformat(),
+              "revenue": round(by_day.get((first + dt.timedelta(days=i)).isoformat(), 0.0), 2)}
+             for i in range((yesterday - first).days + 1)]
+
     # estimates sold within the local-time window covering the 1st .. yesterday
     start, _ = local_day_window_utc(co["tz"], first)
     _, end = local_day_window_utc(co["tz"], yesterday)
@@ -816,7 +829,7 @@ def compute_mtd(company):
     mtd_sales = sum(float(e.get("subtotal") or 0) for e in estimates)
 
     return {"mtdRevenue": round(mtd_rev, 2), "mtdSales": round(mtd_sales, 2),
-            "mtdThrough": yesterday.isoformat()}
+            "mtdThrough": yesterday.isoformat(), "mtdDailyRevenue": daily}
 
 
 def _local_date_str(ts, tz):
