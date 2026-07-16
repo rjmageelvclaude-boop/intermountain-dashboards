@@ -437,6 +437,12 @@ function render(){
   if(co.plumb){ccB+=divd("Plumbing")+mrow("Plumbing Job Budget",plumbJBgt,"#",undefined,null)+mrow("Plumbing Jobs on Board",g("plumbJobsOnBoard"),"#",plumbJBgt,"plumbJobsOnBoard")+mrow("Plumbing Capacity",plumbJBgt>0?(g("plumbJobsOnBoard")/plumbJBgt*100):0,"%",undefined,null)}
   if(co.elec){var elecJBgt=gb(act,"elecJobBudget");ccB+=divd("Electrical")+mrow("Electrical Job Budget",elecJBgt,"#",undefined,null)+mrow("Electrical Jobs on Board",g("elecJobsOnBoard"),"#",elecJBgt,"elecJobsOnBoard")+mrow("Electrical Capacity",elecJBgt>0?(g("elecJobsOnBoard")/elecJBgt*100):0,"%",undefined,null)}
   ccB+=divd("Phones")+mrow("Inbound Calls",g("callsInbound"),"#",undefined,"callsInbound")+mrow("Inbound Leads",g("inboundLeads"),"#",undefined,"inboundLeads")+mrow("Inbound Booking Rate",g("bookingRate"),"%",undefined,"bookingRate");
+  // Memberships sold with no job on today's board - office/phone sales
+  // (job-tied memberships stay in their trade sections)
+  ccB+=divd("Memberships Sold — Office")+mrow("HVAC",g("hvacOfficeMembershipsSold"),"#",undefined,"hvacOfficeMembershipsSold");
+  if(co.plumb){ccB+=mrow("Plumbing",g("plumbOfficeMembershipsSold"),"#",undefined,"plumbOfficeMembershipsSold")}
+  if(co.elec){ccB+=mrow("Electrical",g("elecOfficeMembershipsSold"),"#",undefined,"elecOfficeMembershipsSold")}
+  ccB+=mrow("Total",g("officeMembershipsSold"),"#",undefined,"officeMembershipsSold");
   ccB+=divd("ROPPs")+mrow("ROPP Budget",roppBgt,"#",undefined,null)+mrow("ROPPs on Board",g("hvacRoppsOnBoard"),"#",roppBgt,"hvacRoppsOnBoard");
 
   // Turnover-model companies (Brothers): the tgl* keys carry turnovers -
