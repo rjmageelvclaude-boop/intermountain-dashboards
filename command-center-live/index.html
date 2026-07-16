@@ -210,19 +210,62 @@ function getHistoricalData(){
 function fmt(v,f){if(f==="$")return"$"+Math.round(v).toLocaleString();if(f==="%")return v.toFixed(1)+"%";if(f==="x")return(+v).toFixed(2);return Math.round(v).toLocaleString()}
 function pc(p){return p>=100?"green":p>=80?"yellow":"red"}
 
-function weekdayFilter(entries){return entries.filter(function(e){return isWeekday(e.date)})}
-function sparkSvg(key,color,entries,w,h){
-  var data=weekdayFilter(entries);
-  if(data.length<2)return'';
-  var d=data.map(function(e){return e[key]||0});
-  var mn2=Math.min.apply(null,d),mx=Math.max.apply(null,d),rng=mx-mn2||1,p=2;
-  var pts=d.map(function(v,i){return(p+i/(d.length-1)*(w-p*2))+","+(h-p-(v-mn2)/rng*(h-p*2))});
-  var last=pts[pts.length-1].split(",");
-  var trend=d[d.length-1]>=d[d.length-2]?color:"#ef4444";
-  return'<svg width="'+w+'" height="'+h+'" style="display:block"><polyline points="'+pts.join(" ")+'" fill="none" stroke="'+trend+'" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="'+last[0]+'" cy="'+last[1]+'" r="2" fill="#fff" stroke="'+trend+'" stroke-width="1.5"/></svg>';
+// ── Trend arrows & week-over-week bars (replaces the old min/max sparklines) ──
+// Direction uses a ±5% deadband so tiny wiggles read as flat. Green/red follows
+// the metric's GOOD direction: for the keys below, trending down is good.
+var LOWER_BETTER={hvacSMCanceled:1,hvacSalesCanceled:1,plumbCanceled:1,elecCanceled:1,excavCanceled:1,tglsCanceled:1};
+function histDate(e){return e.date instanceof Date?toYMD(e.date):e.date}
+function trendEntries(){
+  // completed weekdays strictly before the viewed day (history holds full days only)
+  var cutoff=viewDate||toYMD(new Date());
+  return(hist[act]||[]).filter(function(e){
+    var d=histDate(e);
+    return d<cutoff&&isWeekday(new Date(d+"T12:00:00"));
+  });
 }
-function spark3(key,color){return sparkSvg(key,color,(hist[act]||[]).slice(-5),40,22)}
-function spark28(key,color){return sparkSvg(key,color,hist[act]||[],64,22)}
+function trendDir(curr,base){
+  if(base<=0)return curr>0?1:0;
+  var ch=(curr-base)/base*100;
+  return ch>5?1:ch<-5?-1:0;
+}
+function arrowGlyph(dir,key){
+  var good=LOWER_BETTER[key]?-dir:dir;
+  var c=dir===0?"#94a3b8":good>0?"#16a34a":"#ef4444";
+  return'<span style="font-size:'+(dir===0?"13":"10")+'px;font-weight:700;color:'+c+'">'+(dir===0?"→":dir>0?"▲":"▼")+'</span>';
+}
+function trend3(key){
+  var v=trendEntries().map(function(e){return e[key]||0});
+  if(v.length<4)return"";
+  var base=(v[v.length-2]+v[v.length-3]+v[v.length-4])/3;
+  return'<div style="text-align:center;line-height:24px">'+arrowGlyph(trendDir(v[v.length-1],base),key)+'</div>';
+}
+function wowTrend(key,f){
+  var entries=trendEntries();
+  if(entries.length<10)return"";
+  var isRate=f==="%"||f==="x"; // rates average across a week; $ and counts sum
+  var v=entries.map(function(e){return e[key]||0});
+  var agg=function(a){var s=0;a.forEach(function(x){s+=x});return isRate?s/a.length:s};
+  var dir=trendDir(agg(v.slice(-5)),agg(v.slice(-10,-5)));
+  var wk={},order=[];
+  entries.forEach(function(e){
+    var d=new Date(histDate(e)+"T12:00:00"),mon=new Date(d);
+    mon.setDate(d.getDate()-((d.getDay()+6)%7));
+    var kk=toYMD(mon);
+    if(!wk[kk]){wk[kk]={sum:0,n:0};order.push(kk)}
+    wk[kk].sum+=e[key]||0;wk[kk].n++;
+  });
+  var weeks=order.slice(-4).map(function(kk){return{val:isRate?wk[kk].sum/wk[kk].n:wk[kk].sum,partial:wk[kk].n<5}});
+  var mx=0;weeks.forEach(function(w){if(w.val>mx)mx=w.val});
+  if(mx<=0)return"";
+  var bw=7,gp=2,h=22;
+  var bars='<svg width="'+(weeks.length*(bw+gp)-gp)+'" height="'+h+'" style="display:block;flex-shrink:0">';
+  weeks.forEach(function(w,i){
+    var hh=Math.max(2,w.val/mx*(h-2));
+    bars+='<rect x="'+i*(bw+gp)+'" y="'+(h-hh).toFixed(1)+'" width="'+bw+'" height="'+hh.toFixed(1)+'" rx="1.5" fill="'+CO[act].color+'"'+(w.partial?' opacity=".35"':'')+'/>';
+  });
+  bars+='</svg>';
+  return'<div style="display:flex;align-items:center;justify-content:center;gap:5px;height:24px">'+arrowGlyph(dir,key)+bars+'</div>';
+}
 
 function ring(val,max,color,sz){
   sz=sz||58;var pct=max>0?Math.min(val/max*100,120):0,r=(sz-5)/2,circ=2*Math.PI*r;
@@ -233,11 +276,11 @@ function ring(val,max,color,sz){
 function dot(v,b){if(!b||b<=0)return'<div class="dot" style="visibility:hidden"></div>';var p=v/b*100,c=p>=100?"#16a34a":p>=80?"#eab308":"#ef4444";return'<div class="dot" style="background:'+c+'"></div>'}
 
 function mrow(label,val,f,bgt,key,cls){
-  var co=CO[act],c=co.color,p=bgt&&bgt>0?val/bgt*100:null;
+  var p=bgt&&bgt>0?val/bgt*100:null;
   var bg=p!==null?(p>=100?"rgba(22,163,74,.04)":p>=80?"rgba(234,179,8,.03)":"rgba(239,68,68,.04)"):"";
   var dotH=bgt?dot(val,bgt):'<div class="dot" style="visibility:hidden"></div>';
   var pctH=p!==null?'<div class="m-pct '+pc(p)+'">'+Math.round(p)+'%</div>':'<div class="m-pct"></div>';
-  return'<div class="metric-row'+(cls?" "+cls:"")+'" style="background:'+bg+'">'+dotH+'<div class="m-label">'+label+'</div><div class="m-val">'+fmt(val,f)+'</div>'+pctH+'<div class="m-spark3">'+(key?spark3(key,c):"")+'</div><div class="m-spark28">'+(key?spark28(key,c):"")+'</div></div>';
+  return'<div class="metric-row'+(cls?" "+cls:"")+'" style="background:'+bg+'">'+dotH+'<div class="m-label">'+label+'</div><div class="m-val">'+fmt(val,f)+'</div>'+pctH+'<div class="m-spark3">'+(key?trend3(key):"")+'</div><div class="m-spark28">'+(key?wowTrend(key,f):"")+'</div></div>';
 }
 
 function hero(label,val,f,bgt,sub,hasRing,compare){
@@ -408,7 +451,7 @@ function render(){
     {k:"nonBudgetedDays",l:"Non Budgeted Days (YYYY-MM-DD, comma separated)",type:"text"},
   ];
 
-  var sparkHdr='<div class="metric-row" style="border:none;padding:2px 12px"><div class="dot" style="visibility:hidden"></div><div class="m-label"></div><div class="m-val"></div><div class="m-pct"></div><div class="m-spark3"><div class="spark-hdr">3 Day</div></div><div class="m-spark28"><div class="spark-hdr">4 Week</div></div></div>';
+  var sparkHdr='<div class="metric-row" style="border:none;padding:2px 12px"><div class="dot" style="visibility:hidden"></div><div class="m-label"></div><div class="m-val"></div><div class="m-pct"></div><div class="m-spark3"><div class="spark-hdr">3 Day</div></div><div class="m-spark28"><div class="spark-hdr">WoW</div></div></div>';
 
   // Portfolio cards
   var pc2="";
@@ -590,7 +633,7 @@ function render(){
     sec("HVAC Service & Maintenance","❄️",c,co.lg,g("hvacServiceRevenue")>0?"$"+g("hvacServiceRevenue").toLocaleString():null,hB)+
     sec("HVAC Sales","📊",c,co.lg,totalHS>0?"$"+totalHS.toLocaleString():null,sB)+
     sec("Installs","🏗️",codePink?"#ec4899":c,co.lg,instSummary,sparkHdr+instB+cbB)+
-    '</div></div><div class="footer">Live from the ServiceTitan API · Budgeted days auto calculated from weekdays · Weekends excluded from sparklines · Date picker shows historical data</div></div>'+
+    '</div></div><div class="footer">Live from the ServiceTitan API · Budgeted days auto calculated from weekdays · 3 Day arrow = latest day vs the prior 3 weekdays · WoW = last 5 weekdays vs the previous 5, bars are the last 4 weeks (faded = short week) · Date picker shows historical data</div></div>'+
     (pinkBlink?'<div class="code-pink-overlay"></div>':'')+
     overlays;
   if(cancelAlarm||flipAlarm||pinkPopup)startAlarm();else stopAlarm();
