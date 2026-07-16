@@ -282,6 +282,10 @@ def month_events(company, year, month, idx):
                      {"completedOnOrAfter": start, "completedBefore": end,
                       "jobStatus": "Completed"},
                      page_size=500, max_pages=400)
+    # Canceled jobs KEEP their completedOn, so the jobStatus filter is the
+    # only thing excluding them. Verified honored server-side (2026-07-15),
+    # but this endpoint ignores other filters - don't trust it blindly.
+    jobs = [j for j in jobs if j.get("jobStatus") == "Completed"]
     jobs.sort(key=lambda j: j.get("completedOn") or "")
 
     # pass 1: cohort installs into the index, so same-month callbacks link
