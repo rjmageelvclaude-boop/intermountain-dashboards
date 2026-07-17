@@ -12,16 +12,22 @@ the pay plan says it should have been, job by job:
                        adjustments (they are often the hand-corrections for
                        the very dings this board audits, so variance is
                        measured on paid + adjustments)
-  what SHOULD be paid = base rate x net sale, where the base rate comes from
-                       the job type name (RJ's rule):
+  what SHOULD be paid = base rate x net sale, per the official "Comfort
+                       Advisor Pay Policy" (rates by sales category; the
+                       category comes from the job type name, except Goodman
+                       which is read off the billed equipment):
                          contains "Costco"      -> 7%
                          contains "TGL"/"LTO"   -> 8%   (tech-generated lead)
-                         anything else          -> 10%  (marketed)
-                       ...then dinged by the total discount % off book price:
-                         <= 5%        no hit
-                         5% - 7%      -1 point
-                         7% - 10%     -2 points
-                         > 10%        flat 5%
+                         anything else          -> 10%  (straight Sierra)
+                         Goodman equipment      -> flat 5%, no ladder
+                       ...then dinged by the total discount % off book price
+                       (whole points, per the policy):
+                         0-5%         no hit
+                         6-8%         -1 point
+                         9%           -2 points
+                         10%+         flat 5%
+                       Discount-related pay decisions are at the Sales
+                       Manager's discretion - variances are review items.
   discount            = book price (invoice items repriced at today's
                        pricebook, the ca-board scheme) minus net sale, split
                        into explicit discount lines (PriceModifier items,
@@ -64,13 +70,17 @@ TENANT = "SIE"
 TZ = "pacific"
 CA_TEAM = "1ca"              # technicians team, case-insensitive
 
-# ---- the pay plan (RJ, 2026-07-16) -----------------------------------------
-BASE_RATES = {"Costco": 0.07, "TGL": 0.08, "Marketed": 0.10}
-# (discount ceiling, points off the base rate); above the last ceiling the
-# rate is a flat OVER_CAP_RATE regardless of bucket
-TIERS = [(0.05, 0.00), (0.07, 0.01), (0.10, 0.02)]
+# ---- the pay plan ("Comfort Advisor Pay Policy" PDF, applied 2026-07-17) ---
+# Rates by sales category; Goodman is equipment-based (detected from the
+# invoice items - job types don't say Goodman) and pays a flat 5% with no
+# discount ladder, since 5% is also the ladder's floor.
+BASE_RATES = {"Costco": 0.07, "TGL": 0.08, "Marketed": 0.10, "Goodman": 0.05}
+# Discounting rules, in the policy's whole percentage points:
+# 0-5% no effect | 6-8% -1pt | 9% -2pts | 10%+ flat OVER_CAP_RATE.
+# (All discount-related pay decisions are at the Sales Manager's discretion,
+# so a variance is a review item, not automatically an error.)
+TIERS = [(5, 0.00), (8, 0.01), (9, 0.02)]
 OVER_CAP_RATE = 0.05
-EPS = 5e-4                   # a 5.02% discount is "5%", not a ding
 
 FREEZE_DAYS = 45             # month freezes this long after month-end
 VARIANCE_FLAG = 1.0          # |paid+adj - expected| beyond this many $ flags
@@ -98,10 +108,13 @@ def _activity_bucket(activity):
 
 def expected_rate(bucket, disc_pct):
     base = BASE_RATES[bucket]
-    if disc_pct > TIERS[-1][0] + EPS:
+    if bucket == "Goodman":
+        return base                    # flat 5%, no ladder
+    pts = int(disc_pct * 100 + 0.5)    # the policy speaks in whole points
+    if pts >= 10:
         return OVER_CAP_RATE
     for ceiling, hit in TIERS:
-        if disc_pct <= ceiling + EPS:
+        if pts <= ceiling:
             return base - hit
     return OVER_CAP_RATE
 
@@ -196,19 +209,29 @@ SYNC_OVERLAP_MIN = 30
 
 def _slim_invoice(v):
     items = []
+    goodman = 0.0
     for it in (v.get("items") or []):
         typ, tot = it.get("type"), float(it.get("total") or 0)
         if typ == "PriceModifier" or typ in _PB_ENDPOINT:
-            nm = ""
-            if typ == "PriceModifier" or tot < 0:
-                nm = (it.get("displayName") or it.get("skuName") or "").strip()
+            nm = (it.get("displayName") or it.get("skuName") or "").strip()
+            if tot > 0 and "goodman" in nm.lower():
+                goodman += tot         # Goodman sales pay their own flat rate
+            if typ != "PriceModifier" and tot >= 0:
+                nm = ""                # names only kept for discount lines
             items.append([typ, it.get("skuId") or 0,
                           float(it.get("quantity") or 0), tot, nm])
-    return {"sub": float(v.get("subTotal") or 0), "items": items}
+    return {"sub": float(v.get("subTotal") or 0), "items": items,
+            "gm": round(goodman, 2)}
+
+
+INV_STORE_VERSION = 2                  # bump when _slim_invoice changes
 
 
 def sync_invoices(store, job_ids, log=print):
     """Bring store["byJob"] = {jobId: {invoiceId: slim}} current for job_ids."""
+    if store.get("iv") != INV_STORE_VERSION:   # slim format changed - refetch
+        store.clear()
+        store["iv"] = INV_STORE_VERSION
     by_job = store.setdefault("byJob", {})
     now = dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -257,9 +280,10 @@ def price_job(invs, prices):
     are write-offs/credits; unpriceable SKUs fall back to their sold total so
     they can never fake a discount."""
     p = {"sold": 0.0, "list": 0.0, "book": 0.0, "discLines": 0.0,
-         "writeOff": 0.0, "discNames": []}
+         "writeOff": 0.0, "goodman": 0.0, "discNames": []}
     for v in invs.values():
         p["sold"] += v["sub"]
+        p["goodman"] += v.get("gm", 0.0)
         for typ, sku, qty, tot, nm in v["items"]:
             if typ == "PriceModifier":
                 p["discLines"] += -tot             # stored negative
@@ -344,9 +368,13 @@ def build_rows(items, roster, jt_names, inv_store, log=print):
     for jid, r in comm.items():
         job = jobs.get(jid) or {}
         jt = jt_names.get(job.get("jobTypeId"), "")
-        bucket = _bucket(jt)
         invs = by_job.get(str(jid), {})
         p = price_job(invs, prices)
+        bucket = _bucket(jt)
+        # Goodman sales pay their own flat rate regardless of lead source -
+        # it's an equipment attribute, so detect it from what was billed
+        if bucket != "Costco" and p["goodman"] > 0.5 * max(p["list"], 1):
+            bucket = "Goodman"
 
         paid = sum(r["paidBy"].values())
         adj = sum(r["adjBy"].values())
@@ -380,11 +408,11 @@ def build_rows(items, roster, jt_names, inv_store, log=print):
                 flags.append("underpaid")
         if p["book"] - p["list"] > MANIP_FLAG:
             flags.append("price-manip")
-        if disc_pct > TIERS[-1][0] + EPS:
+        if int(disc_pct * 100 + 0.5) >= 10:
             flags.append("disc>10")
         acts = {_activity_bucket(a) for a in r["activities"]}
-        if acts and acts != {bucket}:
-            flags.append("activity-mismatch")
+        if bucket != "Goodman" and acts and acts != {bucket}:
+            flags.append("activity-mismatch")   # payroll paid the wrong category
         if len(r["paidBy"]) > 1:
             flags.append("multi-rep")
         # clawbacks post weeks after the commission - a fresh overpay may

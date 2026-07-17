@@ -63,6 +63,7 @@ tr.click{cursor:pointer}
 .chip.Costco{background:#fdeaea;color:#b42318}
 .chip.TGL{background:#e7f0fc;color:#1663c7}
 .chip.Marketed{background:#e8f6ec;color:#15803d}
+.chip.Goodman{background:#f3e8ff;color:#6d28d9}
 .fl{display:inline-block;font-size:8.5px;font-weight:900;border-radius:4px;padding:1.5px 5px;margin-left:3px;letter-spacing:.02em}
 .fl.overpaid{background:#b42318;color:#fff}
 .fl.underpaid{background:#b45309;color:#fff}
@@ -186,17 +187,19 @@ function kpisHtml(s) {
 
 function ruleHtml() {
   return `<div class="rule">
-    <span class="tag">The pay plan<br>rate by job type</span>
-    <div class="b"><b>10%</b>marketed lead</div>
-    <div class="b"><b>8%</b>"TGL" / "LTO" job types</div>
-    <div class="b"><b>7%</b>"Costco" job types</div>
+    <span class="tag">The pay policy<br>rate by category</span>
+    <div class="b"><b>10%</b>straight Sierra</div>
+    <div class="b"><b>8%</b>TGL / LTO</div>
+    <div class="b"><b>7%</b>Costco</div>
+    <div class="b"><b>5%</b>Goodman (flat)</div>
     <span class="sep">then the discount ding:</span>
-    <div class="b"><b>≤5% off</b>full rate</div>
-    <div class="b"><b>5–7% off</b>−1 point</div>
-    <div class="b"><b>7–10% off</b>−2 points</div>
-    <div class="b"><b>&gt;10% off</b>flat 5%</div>
+    <div class="b"><b>0–5% off</b>full rate</div>
+    <div class="b"><b>6–8% off</b>−1 point</div>
+    <div class="b"><b>9% off</b>−2 points</div>
+    <div class="b"><b>10%+ off</b>flat 5%</div>
     <span class="sep">·</span>
-    <div class="b"><b>discount</b>= book price − net sale<br>(codes + price cuts)</div>
+    <div class="b"><b>discount</b>= book − net sale<br>(codes, cuts &amp; write-offs)</div>
+    <div class="b" style="flex:1.4"><b>Sales Manager discretion</b>variances are review items,<br>not automatic errors</div>
   </div>`;
 }
 
