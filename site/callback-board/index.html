@@ -266,6 +266,75 @@ function equipHtml(b) {
   </div>`;
 }
 
+/* written analysis, generated from the live numbers at render time */
+function analysisHtml(b) {
+  const k = b.kpis;
+  const rows = b.cohorts.filter(r => r.mature["180"] && r.installs);
+  if (rows.length < 3) return "";
+  const label = cur === "combined" ? "the combined group" : DATA.companies[cur].label;
+  const rate = rs => { const i = rs.reduce((s,r)=>s+r.installs,0); return i ? rs.reduce((s,r)=>s+r.u180,0)/i*100 : 0; };
+  const last3 = rate(rows.slice(-3)), prev3 = rows.length >= 6 ? rate(rows.slice(-6,-3)) : null;
+  const overlap = Math.max(0, k.rate180R + k.rate180F - k.rate180);
+  const early = k.rate180 ? k.rate30 / k.rate180 * 100 : 0;
+  const ps = [];
+
+  // headline + bucket structure
+  let p1 = `Across the last six final cohorts, <b>${k.rate180.toFixed(1)}%</b> of ${label}'s installs needed at least one return trip within 180 days —
+    <b>${k.rate180R.toFixed(1)}%</b> had a recall/warranty problem and <b>${k.rate180F.toFixed(1)}%</b> needed a finish visit.`;
+  if (overlap >= 3) p1 += ` <b>${overlap.toFixed(1)} points of installs had both</b> — jobs that leave incomplete are also the ones generating warranty problems.`;
+  ps.push(p1);
+
+  // what dominates
+  if (k.rate180F >= 15)
+    ps.push(`The finish number is the standout: roughly <b>1 in ${Math.round(100/k.rate180F)} installs</b> requires a second trip just to complete the original work
+      (Retro Finish / Startup). That is a scheduling, staging and parts-readiness problem more than a workmanship one — it is also the cheapest share to fix,
+      because the visit was predictable on install day.`);
+  else if (k.rate180F < 3)
+    ps.push(`Finish work is negligible here (${k.rate180F.toFixed(1)}%) — this rate is almost purely <b>install quality</b>: the recall/warranty bucket is the whole story.`);
+  else
+    ps.push(`Recall/warranty dominates (${k.rate180R.toFixed(1)}% vs ${k.rate180F.toFixed(1)}% finish) — install quality, not incomplete jobs, drives this number.`);
+
+  // timing
+  ps.push(`Timing: <b>${k.rate30.toFixed(1)}%</b> of installs are called back within the first 30 days — about ${early.toFixed(0)}% of the installs that will
+    eventually come back within 180 days have their first callback in the first month. Counting every return visit (repeats included), the median gap from
+    install to visit is <b>${k.medianGap} days</b>. Early callbacks skew toward punch-list items (thermostats, drains, breakers); the long tail is seasonal —
+    equipment that fails when the weather first stresses it.`);
+
+  // crew spread
+  const crew = (b.crew || []).filter(r => r.inst >= 15);
+  if (crew.length >= 3) {
+    const w = crew[0], b2 = crew[crew.length - 1];
+    const driver = r => r.rate90r >= r.rate90f ? "recall/warranty" : "finish";
+    ps.push(`Crew spread (15+ aged installs, 90-day basis): worst is <b>${w.n}</b>${cur==="combined" ? " (" + w.co + ")" : ""} at <b>${w.rate90.toFixed(0)}%</b>,
+      driven by ${driver(w)}; best is <b>${b2.n}</b>${cur==="combined" ? " (" + b2.co + ")" : ""} at <b>${b2.rate90.toFixed(0)}%</b>.
+      A ${(w.rate90 - b2.rate90).toFixed(0)}-point gap between crews doing the same work is the strongest evidence that most of this rate is controllable.`);
+  }
+
+  // reasons + cost
+  const rs = (b.reasons || []).filter(r => r[0] !== "Other / unspecified").slice(0, 2);
+  const rtot = (b.reasons || []).reduce((s,r) => s + r[1], 0);
+  if (rs.length === 2 && rtot)
+    ps.push(`Of callbacks with a codable reason, the biggest drivers over the last 12 months are <b>${rs[0][0].toLowerCase()}</b> (${rs[0][1]}) and
+      <b>${rs[1][0].toLowerCase()}</b> (${rs[1][1]}). The cost side: return trips consumed <b>${(k.hrsYr||0).toLocaleString()} scheduled labor hours</b>
+      in 12 months — ${k.hrsPer100} hours per 100 installs of unbilled truck time.`);
+
+  // trend
+  if (prev3 != null) {
+    const d = last3 - prev3;
+    const dir = d <= -3 ? `<b>improving</b> — down ${Math.abs(d).toFixed(1)} points` :
+                d >= 3 ? `<b>worsening</b> — up ${d.toFixed(1)} points` : `<b>flat</b> (${d >= 0 ? "+" : ""}${d.toFixed(1)} points)`;
+    ps.push(`Direction: the three most recent final cohorts run at <b>${last3.toFixed(1)}%</b> vs ${prev3.toFixed(1)}% for the three before — ${dir}.`);
+  }
+
+  return `<div class="tablecard">
+    <div class="t-title">Analysis — ${cur === "combined" ? "Combined" : DATA.companies[cur].label}</div>
+    <div class="t-sub">generated from the live numbers on this page at every refresh</div>
+    <div style="font-size:12.5px;font-weight:600;line-height:1.65;color:#333;max-width:1100px">
+      ${ps.map(p => `<p style="margin:0 0 9px">${p}</p>`).join("")}
+    </div>
+  </div>`;
+}
+
 function cohortHtml(b) {
   const rows = b.cohorts.filter(r => r.installs || r.visits);
   const wins = DATA.windows;
@@ -331,7 +400,7 @@ function render() {
   $("board").innerHTML = kpisHtml(b)
     + `<div class="panels">${curveHtml(b)}${monthlyHtml(b)}${histHtml(b)}</div>`
     + `<div class="panels">${crewHtml(b)}${reasonsHtml(b)}${equipHtml(b)}</div>`
-    + cohortHtml(b) + recentHtml(b);
+    + analysisHtml(b) + cohortHtml(b) + recentHtml(b);
   $("foot").innerHTML = `<b>Definitions:</b> installs = completed, revenue-bearing system/equipment installs in the HVAC install business unit
     (part-install jobs are NOT installs — when they follow one of our installs they count as callbacks).
     <b>Recall/Warranty bucket</b> = the install had a problem: Recall/Warranty and Client Resolution jobs, warranty part installs, and no-charge service returns.
