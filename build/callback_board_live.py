@@ -71,7 +71,7 @@ from command_center_live import (fetch_all, local_today, _load_json,
 from tech_board_live import month_window_utc
 
 HISTORY_FILE = os.path.join(ROOT, "data", "callback-board-history.json")
-CACHE_V = 5                  # bump when classification/schema changes
+CACHE_V = 6                  # bump when classification/schema changes
 WINDOW_CLOSED_MONTHS = 18    # cohort months kept besides the current month
 MONTH_FREEZE_DAYS = 40       # month is final this long after month-end
 MONTH_RECHECK_HOURS = 24     # until frozen, closed months refresh at most daily
@@ -79,6 +79,8 @@ OPEN_CB_LOOKBACK_DAYS = 75   # created-window scanned for still-open callbacks
 WINDOWS = (30, 60, 90, 180)
 RECENT_LIMIT = 60            # rows in the recent-callbacks table per company
 SERVICE_MAX_GAP = 180        # service returns only count this close to install
+RECALL_MAX_GAP = 365         # RJ: >1yr after install is too error-prone; and
+                             # every callback must link to an install at all
 CREW_MIN_INSTALLS = 8        # min mature installs before a tech shows on the board
 
 COMPANIES = {
@@ -104,7 +106,7 @@ RE_DRIVEBY = re.compile(r"drive ?by", re.I)
 # check-ups, inspections, duct cleaning, filter changes
 RE_MAINT = re.compile(r"tune|maint|membership|\bmsa\b|club|precision|filter"
                       r"|check ?up|inspect|duct clean|safety|rejuv"
-                      r"|\bpsc\b|\bpps\b|\bsam maint", re.I)
+                      r"|\bpsc\b|\bpps\b|\bsam (cooling|heating|maint)", re.I)
 RE_EST = re.compile(r"estimate|second opinion", re.I)
 # type names that pin the serviced system as YEARS old - can't be the
 # install we did months ago ("AC Issue 8+ yrs", "HT PSC 4-7", ...)
@@ -348,9 +350,12 @@ def month_events(company, year, month, idx):
         if cat in ("recall", "part"):
             orig = _link(idx, j.get("recallForId"), j.get("projectId"),
                          j.get("locationId"), ref, grace_days=3)
-            # typed recalls in OUR install BU always count (old-install
-            # warranty stays workload); other BUs / part jobs need a link
-            if orig is None and not (cat == "recall" and jbu == bu):
+            # v6 (RJ): every callback must tie to an install no more than a
+            # year back - older attributions are too error-prone, and
+            # unlinkable recalls belong to installs older still
+            if orig is None or not d:
+                continue
+            if (_parse(d) - _parse(orig["d"])).days > RECALL_MAX_GAP:
                 continue
             if cat == "part" and not free and not RE_RECALL.search(
                     RE_TAGS.sub(" ", j.get("summary") or "")):

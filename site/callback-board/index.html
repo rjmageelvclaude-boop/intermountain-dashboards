@@ -326,7 +326,8 @@ function render() {
     + cohortHtml(b) + recentHtml(b);
   $("foot").innerHTML = `<b>Definitions:</b> installs = completed, revenue-bearing system/equipment installs in the HVAC install business unit
     (part-install jobs are NOT installs — when they follow one of our installs they count as callbacks).
-    <b>Recall</b> = Recall/Warranty, Retro Finish, Startup and Client Resolution jobs — work we had to come back for.
+    <b>Recall</b> = Recall/Warranty, Retro Finish, Startup, Client Resolution and warranty part-install jobs — work we had to come back for.
+    Every callback must link to a specific install no more than 12 months back; older links are too error-prone to count. SAM Cooling / SAM Heating member visits never count.
     <b>Service return</b> = any other non-plumbing job (any department) landing at the same project/location within 1&ndash;180 days after our install,
     only when it was a no-charge visit with no quote given — if we billed or quoted, it was a sales opportunity, not a callback.
     Callbacks link to the install by recall link &rarr; project &rarr; location.
