@@ -264,7 +264,7 @@ async function fetchData(){
 async function refresh(){await fetchData();render()}
 
 // ── access gate (hosted mode only; same code as the Command Center) ──
-const ACCESS_HASH="d8305f8a240c399b7b692b604e648533d54b1eb84105f8c9b1d3fa6a55f65120";
+const ACCESS_HASH="96a4dffa15e9fe46d7976f961f3c523639b220b1f3869853bcb05e712feb3bab";
 const ACCESS_KEY="cc-access-v1";
 async function sha256hex(s){
   var b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));

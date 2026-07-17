@@ -403,7 +403,7 @@ async function init(){
 //   crypto.subtle.digest("SHA-256",new TextEncoder().encode("NewCode")).then(b=>console.log([...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")))
 // and paste the printed hash here. Client-side deterrent only - the pay
 // section stays separately encrypted under SCORECARD_KEY regardless.
-const ACCESS_HASH = "d8305f8a240c399b7b692b604e648533d54b1eb84105f8c9b1d3fa6a55f65120";
+const ACCESS_HASH = "96a4dffa15e9fe46d7976f961f3c523639b220b1f3869853bcb05e712feb3bab";
 const ACCESS_KEY = "cc-access-v1"; // shared with the other locked boards: one entry per session unlocks all
 async function sha256hexGate(s){
   const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));

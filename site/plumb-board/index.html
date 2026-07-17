@@ -254,7 +254,25 @@ $("pause").onclick = () => {
 };
 timer = setInterval(() => { if (!paused && pages.length > 1) step(1); }, ROTATE_SECS * 1000);
 setInterval(load, RELOAD_MINS * 60 * 1000);
-load();
+// ── access gate (hosted mode only; same code as the Command Center) ──
+const ACCESS_HASH="96a4dffa15e9fe46d7976f961f3c523639b220b1f3869853bcb05e712feb3bab";
+const ACCESS_KEY="cc-access-v1";
+async function sha256hex(s){
+  var b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));
+  return[...new Uint8Array(b)].map(function(x){return x.toString(16).padStart(2,"0")}).join("");
+}
+async function gate(){
+  var isLocal=location.protocol!=="https:";
+  if(isLocal||!window.isSecureContext)return true;
+  if(sessionStorage.getItem(ACCESS_KEY)===ACCESS_HASH)return true; // session-scoped: code required again after the browser closes
+  for(;;){
+    var code=prompt("Plumber Leaderboard\n\nEnter access code:");
+    if(code===null)continue;
+    if(await sha256hex(code.trim())===ACCESS_HASH){sessionStorage.setItem(ACCESS_KEY,ACCESS_HASH);return true}
+    alert("Wrong access code.");
+  }
+}
+gate().then(load);
 </script>
 </body>
 </html>
