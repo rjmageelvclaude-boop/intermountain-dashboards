@@ -71,7 +71,7 @@ from command_center_live import (fetch_all, local_today, _load_json,
 from tech_board_live import month_window_utc
 
 HISTORY_FILE = os.path.join(ROOT, "data", "callback-board-history.json")
-CACHE_V = 6                  # bump when classification/schema changes
+CACHE_V = 7                  # bump when classification/schema changes
 WINDOW_CLOSED_MONTHS = 18    # cohort months kept besides the current month
 MONTH_FREEZE_DAYS = 40       # month is final this long after month-end
 MONTH_RECHECK_HOURS = 24     # until frozen, closed months refresh at most daily
@@ -120,6 +120,10 @@ RE_NEWCON = re.compile(r"\bnc\s*-|new construction|rough ?in", re.I)
 RE_RECALL = re.compile(r"recall|warranty|retro finish|client resolution", re.I)
 RE_STARTUP = re.compile(r"start\s*-?\s*up", re.I)
 RE_PART = re.compile(r"\bparts?\b", re.I)
+# bucket split (RJ): "finish" = we couldn't finish on install day (Retro
+# Finish / Startup commissioning); everything else is "recall" = the
+# install had a problem (Recall/Warranty, parts, no-charge service returns)
+RE_FINISH_TY = re.compile(r"retro finish|start\s*-?\s*up", re.I)
 
 
 def classify(type_name, bu_name=""):
@@ -360,7 +364,8 @@ def month_events(company, year, month, idx):
             if cat == "part" and not free and not RE_RECALL.search(
                     RE_TAGS.sub(" ", j.get("summary") or "")):
                 continue                  # sold part/accessory install
-            bucket = "recall"
+            bucket = "finish" if RE_FINISH_TY.search(tname or "") else "recall"
+            src = bucket
         else:                             # neutral -> service-return candidate
             if not free:
                 continue                  # billed visit = sold work, not ours
@@ -375,15 +380,12 @@ def month_events(company, year, month, idx):
             gap = (_parse(d) - _parse(orig["d"])).days
             if gap < 1 or gap > SERVICE_MAX_GAP:
                 continue
-            bucket = "service"
+            bucket, src = "recall", "service"  # problem with our install
 
-        cb = {"i": j["id"], "b": bucket, "ty": tname or "?", "d": d,
+        cb = {"i": j["id"], "b": bucket, "s": src, "ty": tname or "?", "d": d,
               "rsn": reason(tname, j.get("summary"), cat),
-              "oi": None, "om": None, "gap": None, "hrs": 0}
-        if orig is not None and d:
-            cb["oi"] = orig["i"]
-            cb["om"] = orig["d"][:7]
-            cb["gap"] = max(0, (_parse(d) - _parse(orig["d"])).days)
+              "oi": orig["i"], "om": orig["d"][:7],
+              "gap": max(0, (_parse(d) - _parse(orig["d"])).days), "hrs": 0}
         callbacks.append(cb)
         appt_of_cb[j["id"]] = [a for a in (j.get("firstAppointmentId"),
                                            j.get("lastAppointmentId")) if a]
@@ -522,8 +524,9 @@ def compute_company(company, deadline=None, progress=None):
 
 # ---------------------------------------------------------------- aggregate
 def _blank_cohort():
-    c = {"installs": 0, "visits": 0, "recall": 0, "service": 0}
-    c.update({f"u{w}": 0 for w in WINDOWS})
+    c = {"installs": 0, "visits": 0, "recall": 0, "finish": 0}
+    for w in WINDOWS:
+        c.update({f"u{w}": 0, f"u{w}r": 0, f"u{w}f": 0})
     return c
 
 
@@ -548,10 +551,14 @@ def aggregate(months, today):
             cbs = linked.get(inst["i"], ())
             c["visits"] += len(cbs)
             c["recall"] += sum(1 for x in cbs if x["b"] == "recall")
-            c["service"] += sum(1 for x in cbs if x["b"] == "service")
+            c["finish"] += sum(1 for x in cbs if x["b"] == "finish")
             for w in WINDOWS:
                 if any(x["gap"] <= w for x in cbs):
                     c[f"u{w}"] += 1
+                if any(x["gap"] <= w for x in cbs if x["b"] == "recall"):
+                    c[f"u{w}r"] += 1
+                if any(x["gap"] <= w for x in cbs if x["b"] == "finish"):
+                    c[f"u{w}f"] += 1
             age = (today - _parse(inst["d"])).days
             if age > 180:
                 curve_n += 1
@@ -589,7 +596,7 @@ def aggregate(months, today):
     for k in keys:
         ev = months[k]
         rec = sum(1 for x in ev["callbacks"] if x["b"] == "recall")
-        svc = len(ev["callbacks"]) - rec
+        fin = len(ev["callbacks"]) - rec
         hrs = sum(x.get("hrs") or 0 for x in ev["callbacks"])
         # normalize by the installs those callbacks can come from:
         # this month + the 5 before it (~ the 180-day tail); months without
@@ -598,11 +605,11 @@ def aggregate(months, today):
                    if p <= k and (int(k[:4]) * 12 + int(k[5:7]))
                    - (int(p[:4]) * 12 + int(p[5:7])) < 6)
         full_pool = keys.index(k) >= 5
-        monthly.append({"month": k, "visits": rec + svc, "recall": rec,
-                        "service": svc, "qa": ev["qa"], "drywall": ev["drywall"],
+        monthly.append({"month": k, "visits": rec + fin, "recall": rec,
+                        "finish": fin, "qa": ev["qa"], "drywall": ev["drywall"],
                         "installs": cohorts[k]["installs"],
                         "hrs": round(hrs, 1),
-                        "per100": round((rec + svc) / pool * 100, 1)
+                        "per100": round((rec + fin) / pool * 100, 1)
                                   if pool and full_pool else None})
         for x in ev["callbacks"]:
             g = x.get("gap")
@@ -614,7 +621,8 @@ def aggregate(months, today):
                 if g is not None:
                     gaps_12mo.append(g)
                 reasons[x["rsn"]] = reasons.get(x["rsn"], 0) + 1
-            recent.append({"date": x["d"], "type": x["ty"], "cat": x["b"],
+            recent.append({"date": x["d"], "type": x["ty"],
+                           "cat": x.get("s") or x["b"],
                            "rsn": x["rsn"], "gap": g, "om": x.get("om")})
     recent.sort(key=lambda r: r["date"] or "", reverse=True)
     gaps_12mo.sort()
@@ -647,10 +655,15 @@ def crew_rows(months, names, today, label):
                 continue
             cbs = linked.get(inst["i"], ())
             hit90 = any(x["gap"] <= 90 for x in cbs)
+            hit90r = any(x["gap"] <= 90 for x in cbs if x["b"] == "recall")
+            hit90f = any(x["gap"] <= 90 for x in cbs if x["b"] == "finish")
             for t in inst.get("tc", ()):
-                s = stats.setdefault(t, {"inst": 0, "cb90": 0, "visits": 0})
+                s = stats.setdefault(t, {"inst": 0, "cb90": 0, "cb90r": 0,
+                                         "cb90f": 0, "visits": 0})
                 s["inst"] += 1
                 s["cb90"] += hit90
+                s["cb90r"] += hit90r
+                s["cb90f"] += hit90f
                 s["visits"] += len(cbs)
     rows = []
     for t, s in stats.items():
@@ -659,6 +672,8 @@ def crew_rows(months, names, today, label):
         rows.append({"n": names.get(t) or f"Tech {t}", "co": label,
                      "inst": s["inst"],
                      "rate90": round(s["cb90"] / s["inst"] * 100, 1),
+                     "rate90r": round(s["cb90r"] / s["inst"] * 100, 1),
+                     "rate90f": round(s["cb90f"] / s["inst"] * 100, 1),
                      "per100": round(s["visits"] / s["inst"] * 100)})
     rows.sort(key=lambda r: (-r["rate90"], -r["inst"]))
     return rows
@@ -693,29 +708,32 @@ def _kpis(agg, open_cb, today):
     rows = agg["cohorts"]
     cur_key = today.isoformat()[:7]
 
-    def mature_rate(w, last_n=6):
+    def mature_rate(w, last_n=6, suffix=""):
         m = [r for r in rows if r["mature"][str(w)] and r["installs"]][-last_n:]
         inst = sum(r["installs"] for r in m)
-        return (sum(r[f"u{w}"] for r in m) / inst * 100) if inst else 0, inst
+        return (sum(r[f"u{w}{suffix}"] for r in m) / inst * 100) if inst else 0, inst
 
     r30, _ = mature_rate(30)
     r90, _ = mature_rate(90)
     r180, n180 = mature_rate(180)
+    r180r, _ = mature_rate(180, suffix="r")
+    r180f, _ = mature_rate(180, suffix="f")
     yr = [m for m in agg["monthly"] if m["month"] != cur_key][-12:]
     visits_yr = sum(m["visits"] for m in yr)
     installs_yr = sum(m["installs"] for m in yr)
     hrs_yr = sum(m["hrs"] for m in yr)
     mtd = next((m for m in agg["monthly"] if m["month"] == cur_key),
-               {"visits": 0, "recall": 0, "service": 0, "installs": 0})
+               {"visits": 0, "recall": 0, "finish": 0, "installs": 0})
     return {
         "rate30": round(r30, 1), "rate90": round(r90, 1),
         "rate180": round(r180, 1), "rate180Installs": n180,
+        "rate180R": round(r180r, 1), "rate180F": round(r180f, 1),
         "visitsPer100": round(visits_yr / installs_yr * 100, 1) if installs_yr else 0,
         "visitsYr": visits_yr,
         "hrsYr": round(hrs_yr),
         "hrsPer100": round(hrs_yr / installs_yr * 100) if installs_yr else 0,
         "mtdVisits": mtd["visits"], "mtdRecall": mtd["recall"],
-        "mtdService": mtd["service"], "mtdInstalls": mtd["installs"],
+        "mtdFinish": mtd["finish"], "mtdInstalls": mtd["installs"],
         "openCallbacks": open_cb,
         "medianGap": agg["medianGap"],
     }
@@ -781,10 +799,10 @@ if __name__ == "__main__":
         y, m = map(int, ym.split("-"))
         ev = month_events(company, y, m, new_index())
         rec = sum(1 for c in ev["callbacks"] if c["b"] == "recall")
-        svc = len(ev["callbacks"]) - rec
+        fin = len(ev["callbacks"]) - rec
         lk = sum(1 for c in ev["callbacks"] if c.get("oi") is not None)
         print(f"{company} {ym}: {len(ev['installs'])} installs, "
-              f"{len(ev['callbacks'])} callbacks ({rec} recall, {svc} service, "
+              f"{len(ev['callbacks'])} callbacks ({rec} recall/warr, {fin} finish, "
               f"{lk} linked), qa {ev['qa']}, drywall {ev['drywall']}")
         for c in ev["callbacks"][:15]:
             print(f"  {c['d']} {c['b']:7s} gap={c['gap']} {c['rsn']:22s} {c['ty']}")

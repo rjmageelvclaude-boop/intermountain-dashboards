@@ -114,20 +114,20 @@ const mLabel = k => MONTHS[parseInt(k.slice(5),10)-1] + " " + k.slice(2,4);
 function kpisHtml(b) {
   const k = b.kpis;
   return `<div class="kpis">
-    <div class="kpi hero"><div class="v">${k.rate180.toFixed(1)}%</div><div class="k">180-day callback rate</div>
+    <div class="kpi hero"><div class="v">${k.rate180.toFixed(1)}%</div><div class="k">180-day callback rate &middot; combined</div>
       <div class="s">installs we went back to within 180 days &middot; final cohorts only (${k.rate180Installs} installs)</div></div>
+    <div class="kpi"><div class="v ${pctc(k.rate180R)}">${k.rate180R.toFixed(1)}%</div><div class="k">Recall / Warranty &middot; 180d</div>
+      <div class="s">the install had a problem &middot; incl. warranty parts &amp; no-charge service returns</div></div>
+    <div class="kpi"><div class="v ${pctc(k.rate180F)}">${k.rate180F.toFixed(1)}%</div><div class="k">Finish &middot; 180d</div>
+      <div class="s">Retro Finish / Startup &mdash; couldn't finish on install day</div></div>
     <div class="kpi"><div class="v ${pctc(k.rate30)}">${k.rate30.toFixed(1)}%</div><div class="k">Within 30 days</div>
-      <div class="s">last 6 final cohorts</div></div>
+      <div class="s">combined &middot; last 6 final cohorts</div></div>
     <div class="kpi"><div class="v ${pctc(k.rate90)}">${k.rate90.toFixed(1)}%</div><div class="k">Within 90 days</div>
-      <div class="s">last 6 final cohorts</div></div>
-    <div class="kpi"><div class="v">${k.visitsPer100.toFixed(0)}</div><div class="k">Return trips / 100 installs</div>
-      <div class="s">${k.visitsYr} callback visits in the last 12 months</div></div>
+      <div class="s">combined &middot; last 6 final cohorts</div></div>
     <div class="kpi"><div class="v">${k.mtdVisits}</div><div class="k">Callback visits MTD</div>
-      <div class="s">${k.mtdRecall} recall &middot; ${k.mtdService} service return &middot; ${k.mtdInstalls} installs</div></div>
+      <div class="s">${k.mtdRecall} recall/warr &middot; ${k.mtdFinish} finish &middot; ${k.mtdInstalls} installs</div></div>
     <div class="kpi"><div class="v">${k.openCallbacks == null ? "—" : k.openCallbacks}</div><div class="k">Open callbacks now</div>
       <div class="s">booked, not yet completed</div></div>
-    <div class="kpi"><div class="v">${k.medianGap}<span style="font-size:14px"> days</span></div><div class="k">Median time to callback</div>
-      <div class="s">from install completion, last 12 months</div></div>
     <div class="kpi"><div class="v">${k.hrsPer100}<span style="font-size:14px"> hrs</span></div><div class="k">Return-trip hours / 100 installs</div>
       <div class="s">${(k.hrsYr||0).toLocaleString()} scheduled labor hours in the last 12 months</div></div>
   </div>`;
@@ -179,7 +179,7 @@ function monthlyHtml(b) {
     const x0 = P + i * bw + 2;
     const hR = (H - 26) - y(m.recall);
     return `<rect x="${x0}" y="${y(m.recall)}" width="${bw-4}" height="${Math.max(hR,0)}" fill="#b42318" rx="2"/>
-      <rect x="${x0}" y="${y(m.recall + m.service)}" width="${bw-4}" height="${Math.max(y(m.recall)-y(m.recall+m.service),0)}" fill="#e0a421" rx="2"/>
+      <rect x="${x0}" y="${y(m.recall + m.finish)}" width="${bw-4}" height="${Math.max(y(m.recall)-y(m.recall+m.finish),0)}" fill="#e0a421" rx="2"/>
       <text x="${x0+(bw-4)/2}" y="${y(m.visits)-4}" font-size="8.5" font-weight="800" fill="#555" text-anchor="middle">${m.visits||""}</text>
       ${i % 2 === (ms.length % 2 ? 0 : 1) ? `<text x="${x0+(bw-4)/2}" y="${H-14}" font-size="8" font-weight="700" fill="#9aa1ab" text-anchor="middle">${mLabel(m.month)}</text>` : ""}`;
   }).join("");
@@ -189,7 +189,7 @@ function monthlyHtml(b) {
   const last = ms.filter(m => m.per100 != null).slice(-1)[0];
   return `<div class="panel">
     <div class="p-title">Callback workload by month</div>
-    <div class="p-sub"><span style="color:#b42318">&#9632;</span> recall / finish &nbsp;<span style="color:#e0a421">&#9632;</span> service returns after install &middot; dashed line = trips per 100 recent installs${last ? " (now " + last.per100.toFixed(0) + ")" : ""}</div>
+    <div class="p-sub"><span style="color:#b42318">&#9632;</span> recall / warranty &nbsp;<span style="color:#e0a421">&#9632;</span> finish (retro finish / startup) &middot; dashed line = trips per 100 recent installs${last ? " (now " + last.per100.toFixed(0) + ")" : ""}</div>
     <div class="sline"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${bars}${line}</svg></div>
   </div>`;
 }
@@ -217,11 +217,13 @@ function crewHtml(b) {
   if (!rows.length) return `<div class="panel"><div class="p-title">Callback rate by installer</div><div class="empty">No crews with ${8}+ aged installs yet</div></div>`;
   return `<div class="panel">
     <div class="p-title">Callback rate by installer</div>
-    <div class="p-sub">crew members on the original install &middot; installs at least 90 days old &middot; % = share of those installs we went back to within 90 days &middot; worst first</div>
+    <div class="p-sub">crew members on the original install &middot; installs at least 90 days old &middot; % = share of those installs we went back to within 90 days &middot; worst combined first</div>
     <div class="ptable"><table>
-      <tr><th class="l">Installer</th>${cur==="combined"?'<th class="l">Co</th>':""}<th>Installs</th><th>&le;90d CB rate</th><th>Trips / 100</th></tr>
+      <tr><th class="l">Installer</th>${cur==="combined"?'<th class="l">Co</th>':""}<th>Installs</th><th>Rec/Warr</th><th>Finish</th><th>Combined</th><th>Trips / 100</th></tr>
       ${rows.map(r => `<tr><td class="l">${r.n}</td>${cur==="combined"?`<td class="l">${r.co}</td>`:""}
-        <td>${r.inst}</td><td class="${c90(r.rate90)}">${r.rate90.toFixed(1)}%</td><td>${r.per100}</td></tr>`).join("")}
+        <td>${r.inst}</td><td class="${c90(r.rate90r)}">${r.rate90r.toFixed(1)}%</td>
+        <td class="${c90(r.rate90f)}">${r.rate90f.toFixed(1)}%</td>
+        <td class="${c90(r.rate90)}">${r.rate90.toFixed(1)}%</td><td>${r.per100}</td></tr>`).join("")}
     </table></div>
   </div>`;
 }
@@ -274,22 +276,28 @@ function cohortHtml(b) {
       const mature = r.mature[String(w)];
       return `<td class="${mature ? pctc(v) : "imm"}" title="${r[`u${w}`]} of ${r.installs} installs${mature ? "" : " — cohort still aging, not final"}">${v.toFixed(1)}%${mature ? "" : " …"}</td>`;
     }).join("");
+    const split = ["u180r","u180f"].map(f => {
+      const v = r.installs ? r[f] / r.installs * 100 : 0;
+      const mature = r.mature["180"];
+      return `<td class="${mature ? pctc(v) : "imm"}">${v.toFixed(1)}%${mature ? "" : " …"}</td>`;
+    }).join("");
     return `<tr>
       <td class="l ${r.month===curKey?"cur":""}">${mLabel(r.month)}${r.month===curKey?" (MTD)":""}</td>
-      <td>${r.installs.toLocaleString()}</td>${cells}
-      <td>${r.visits}</td><td>${r.recall}</td><td>${r.service}</td>
+      <td>${r.installs.toLocaleString()}</td>${cells}${split}
+      <td>${r.visits}</td><td>${r.recall}</td><td>${r.finish}</td>
       <td>${r.installs ? (r.visits/r.installs).toFixed(2) : "—"}</td></tr>`;
   }).join("");
-  const t = rows.reduce((a,r) => { for (const k of ["installs","visits","recall","service"]) a[k]+=r[k]; return a; }, {installs:0,visits:0,recall:0,service:0});
+  const t = rows.reduce((a,r) => { for (const k of ["installs","visits","recall","finish"]) a[k]+=r[k]; return a; }, {installs:0,visits:0,recall:0,finish:0});
   return `<div class="tablecard">
     <div class="t-title">Install cohorts — callback rate by age window</div>
     <div class="t-sub">each row = installs completed that month &middot; %-columns = share of those installs we returned to within 30/60/90/180 days &middot; <i>italic …</i> = window not complete yet, running value shown &middot; visits count every return trip (an install can have several)</div>
     <div class="tscroll"><table>
       <tr><th class="l">Install month</th><th>Installs</th>${wins.map(w=>`<th>&le;${w}d</th>`).join("")}
-      <th>Return visits</th><th>Recall</th><th>Service</th><th>Trips / install</th></tr>
+      <th>180d R/W</th><th>180d Fin</th>
+      <th>Return visits</th><th>Rec/Warr</th><th>Finish</th><th>Trips / install</th></tr>
       ${body}
       <tr class="tot"><td class="l">Total</td><td>${t.installs.toLocaleString()}</td>
-      <td colspan="${wins.length}"></td><td>${t.visits}</td><td>${t.recall}</td><td>${t.service}</td>
+      <td colspan="${wins.length + 2}"></td><td>${t.visits}</td><td>${t.recall}</td><td>${t.finish}</td>
       <td>${t.installs ? (t.visits/t.installs).toFixed(2) : "—"}</td></tr>
     </table></div>
   </div>`;
@@ -326,9 +334,10 @@ function render() {
     + cohortHtml(b) + recentHtml(b);
   $("foot").innerHTML = `<b>Definitions:</b> installs = completed, revenue-bearing system/equipment installs in the HVAC install business unit
     (part-install jobs are NOT installs — when they follow one of our installs they count as callbacks).
-    <b>Recall</b> = Recall/Warranty, Retro Finish, Startup, Client Resolution and warranty part-install jobs — work we had to come back for.
+    <b>Recall/Warranty bucket</b> = the install had a problem: Recall/Warranty and Client Resolution jobs, warranty part installs, and no-charge service returns.
+    <b>Finish bucket</b> = we couldn't finish on install day: Retro Finish and Startup jobs.
     Every callback must link to a specific install no more than 12 months back; older links are too error-prone to count. SAM Cooling / SAM Heating member visits never count.
-    <b>Service return</b> = any other non-plumbing job (any department) landing at the same project/location within 1&ndash;180 days after our install,
+    A <b>service return</b> (counted in Recall/Warranty) = any other non-plumbing job, any department, landing at the same project/location within 1&ndash;180 days after our install,
     only when it was a no-charge visit with no quote given — if we billed or quoted, it was a sales opportunity, not a callback.
     Callbacks link to the install by recall link &rarr; project &rarr; location.
     <b>Excluded:</b> plumbing, Drive By, membership tune-ups, estimates, Quality Assurance and drywall visits (planned), and canceled jobs.
