@@ -39,7 +39,11 @@ against the deck's Week-10 numbers (2026-07-05 snapshot):
                    next-day = first-appointment start vs creation day
   HVAC sales (CA)  completed HVAC-Sales-bucket jobs: Costco = the Costco BU
                    (regardless of job type), TGL = TGL-typed remainder,
-                   Marketed = the rest; closed = a sold (non-dismissed)
+                   Marketed = the rest. ULTIMATE doesn't type its sales jobs
+                   reliably, so there the lead source decides instead: a job
+                   with a generated lead (jobGeneratedLeadSource - a tech
+                   turned it over) is TGL, no lead source = Marketed.
+                   closed = a sold (non-dismissed)
                    estimate on the job in the week. Sold runs get auto-marked
                    No Charge/Non-Opportunity when their project is created,
                    so a run counts when it passes the opportunity rule OR
@@ -91,7 +95,7 @@ HISTORY_FILE = os.path.join(ROOT, "data", "wow-board-history.json")
 # Bump when metric definitions change: cached weeks computed under an older
 # version are recomputed instead of served (the Actions cache would otherwise
 # keep serving frozen weeks built with the old definitions forever).
-DEFS_VER = 3
+DEFS_VER = 4
 WEEK1_FROM = dt.date(2026, 5, 1)     # the deck's Week 1: Fri 5/1 - Sun 5/3
 WEEK1_TO = dt.date(2026, 5, 3)
 FREEZE_DAYS = 10                     # closed week is final this long after its Sunday
@@ -334,10 +338,18 @@ def compute_week(company, day_from, day_to, ctx):
             if j["id"] in sales_bad_leads:
                 continue
             # Costco is BU-scoped (a TGL-typed job in the Costco BU is Costco);
-            # TGL is the TGL-typed remainder of HVAC - Sales
+            # TGL is the TGL-typed remainder of HVAC - Sales. Ultimate doesn't
+            # type its sales jobs reliably, so there the lead source decides:
+            # a tech-generated lead (jobGeneratedLeadSource) is TGL, no lead
+            # source means the call came from marketing.
             name = (jt_names.get(j.get("jobTypeId")) or "").lower()
-            cat = ("costco" if j.get("businessUnitId") in cc["costco_bu"]
-                   else "tgl" if "tgl" in name else "mkt")
+            if j.get("businessUnitId") in cc["costco_bu"]:
+                cat = "costco"
+            elif company == "ultimate":
+                src = j.get("jobGeneratedLeadSource") or {}
+                cat = "tgl" if src.get("employeeId") else "mkt"
+            else:
+                cat = "tgl" if "tgl" in name else "mkt"
             ca_ran[cat] += 1
             ca_closed[cat] += bool(sold_on_job.get(j["id"]))
             continue
