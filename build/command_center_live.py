@@ -64,7 +64,7 @@ from servicetitan_client import st_get
 DATA_DIR = os.path.join(ROOT, "data")
 CONFIG_CACHE = os.path.join(DATA_DIR, "command-center-st-config.json")
 HISTORY_FILE = os.path.join(DATA_DIR, "command-center-history.json")
-HISTORY_WEEKDAYS = 20          # sparkline depth (business days)
+HISTORY_WEEKDAYS = 20          # history depth in business days (weekends inside the span cached too)
 CONFIG_TTL_HOURS = 24 * 7      # job-type list cache
 
 COMPANIES = {
@@ -997,12 +997,18 @@ def compute_current():
 
 
 def _history_days(tz, n=HISTORY_WEEKDAYS):
-    """Last n weekdays before today (oldest first)."""
-    days, d = [], local_today(tz)
-    while len(days) < n:
+    """All days back through the last n weekdays before today (oldest first).
+
+    Weekends inside that span are included (added 2026-07-20 so the date
+    picker can show Saturday/Sunday); the frontend's trend arrows and WoW
+    bars filter to weekdays themselves, so trends stay business-day based.
+    """
+    days, d, wk = [], local_today(tz), 0
+    while wk < n:
         d -= dt.timedelta(days=1)
+        days.append(d)
         if d.weekday() < 5:
-            days.append(d)
+            wk += 1
     return list(reversed(days))
 
 
@@ -1018,7 +1024,8 @@ def read_history():
 
 
 def compute_history(progress=None):
-    """Past-weekday metrics per company, cached on disk (past days never change).
+    """Past-day metrics per company (weekends included), cached on disk
+    (past days never change).
 
     Entries missing sameDayDef=7 predate the current metric definitions (v2:
     sold-today same-day installs; v3: memberships sold from the memberships
