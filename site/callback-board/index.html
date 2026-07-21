@@ -253,9 +253,9 @@ function equipHtml(b) {
   const rate = (u,n) => n ? (u/n*100).toFixed(1) + "%" : "—";
   return `<div class="panel">
     <div class="p-title">Callback rate by equipment</div>
-    <div class="p-sub">category from the install job type &middot; rates use only installs old enough for each window</div>
+    <div class="p-sub">condenser model series recorded on the site at install &middot; two-system installs count under each model &middot; rates use only installs old enough for each window</div>
     <div class="ptable"><table>
-      <tr><th class="l">Installed</th><th>Installs</th><th>&le;90d</th><th>&le;180d</th></tr>
+      <tr><th class="l">Condenser</th><th>Installs</th><th>&le;90d</th><th>&le;180d</th></tr>
       ${rows.map(r => {
         const v90 = r.n90 ? r.u90/r.n90*100 : null;
         const cls = v90 == null ? "" : v90 <= 15 ? "cell-good" : v90 <= 30 ? "cell-mid" : "cell-bad";
@@ -411,6 +411,8 @@ function render() {
     Callbacks link to the install by recall link &rarr; project &rarr; location.
     <b>Excluded:</b> plumbing, Drive By, membership tune-ups, estimates, Quality Assurance and drywall visits (planned), and canceled jobs.
     Hours are scheduled appointment hours on the return trips.
+    The equipment panel keys each install to the <b>condenser model series</b> recorded in the location's installed equipment within 7 days of install completion —
+    &ldquo;No condenser&rdquo; = furnace/coil/other equipment was logged but no condenser; &ldquo;Not recorded&rdquo; = the crew logged no equipment (or only a thermostat/accessory) near the install date.
     A cohort's 30/60/90/180-day cell is final only once every install in it has had that long to fail — italic cells are still aging.
     Early-2025 cohorts may undercount at Sierra/Ultimate if recall job types weren't yet in consistent use.
     &nbsp;·&nbsp; Updated ${DATA.updated}${DATA.complete ? "" : " · <span style='color:#b45309'>backfill in progress — some closed months still computing</span>"}`;

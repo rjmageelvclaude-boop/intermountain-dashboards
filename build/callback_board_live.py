@@ -45,8 +45,11 @@ location (latest install completed on or before the callback was created;
 fetch time, oldest month first, so every month sees all earlier installs.
 
 Per install we also fetch the assigned crew (appointment-assignments) for
-the per-installer callback rate, and per callback the appointment durations
-for return-trip labor hours. Reason coding is regexed from the job summary.
+the per-installer callback rate, per callback the appointment durations for
+return-trip labor hours, and the location's installed-equipment records for
+the condenser model series (RJ 2026-07-20: the equipment panel ties to the
+actual condenser set on the job, not the job-type name). Reason coding is
+regexed from the job summary.
 
 Closed months are cached in data/callback-board-history.json (schema v2),
 recomputed at most daily until 40 days past month-end, then frozen. Current
@@ -71,7 +74,7 @@ from command_center_live import (fetch_all, local_today, _load_json,
 from tech_board_live import month_window_utc
 
 HISTORY_FILE = os.path.join(ROOT, "data", "callback-board-history.json")
-CACHE_V = 7                  # bump when classification/schema changes
+CACHE_V = 8                  # bump when classification/schema changes
 WINDOW_CLOSED_MONTHS = 18    # cohort months kept besides the current month
 MONTH_FREEZE_DAYS = 40       # month is final this long after month-end
 MONTH_RECHECK_HOURS = 24     # until frozen, closed months refresh at most daily
@@ -180,19 +183,131 @@ def reason(type_name, summary, cat):
     return "Other / unspecified"
 
 
-# equipment category from the install job-type name
-EQUIP = [("Package", r"package"), ("Heat Pump", r"heat pump"),
-         ("Mini Split", r"mini ?split"), ("Furnace 80%", r"80%"),
-         ("Furnace 90%", r"90%|96%"), ("Condenser / Coil", r"condenser|\bcoil\b"),
-         ("Ductwork", r"duct"), ("Aquatherm", r"aquatherm")]
-EQUIP = [(lbl, re.compile(rx, re.I)) for lbl, rx in EQUIP]
+# ------------------------------------------------- equipment (RJ 2026-07-20)
+# The equipment panel keys each install to the CONDENSER model recorded at
+# the location (equipmentsystems installed-equipment), not the job-type name.
+# Crews log the new equipment with installedOn = install day, mixed in with
+# the home's old gear, so records only count within EQUIP_MATCH_DAYS of the
+# install completion. Full model numbers (EL18KCV-048-230) split product
+# lines by tonnage/voltage, so models roll up to a SERIES label; installs
+# with near-date records but no condenser show "No condenser" (furnace/coil/
+# duct jobs), installs with no records at all show "Not recorded".
+EQUIP_MATCH_DAYS = 7
+
+# obvious non-condenser gear (checked on name+model+manufacturer text)
+RE_EQ_NOT_COND = re.compile(
+    r"coil|furnace|air ?handler|thermostat|t-?stat|\buv\b|filter|filtration"
+    r"|humidif|water heater|damper|zone|duct|evap|purif|ionizer|surge"
+    r"|\breme\b|halo|blower|media|apco|tank|heat (kit|strip)", re.I)
+# model prefixes of known non-condensers (coils, furnaces, air handlers,
+# heat kits) whose record name sometimes just says "AC" - never fall through
+# to the keyword guess for these
+RE_EQ_NOT_MODEL = re.compile(
+    r"CAPT|CHPT|CAPE|CAPF|CSCF|CK40|CH33|CHX|CBK|CBA|CBX|ECB|LP\d"
+    r"|ML1\d{2}|EL2\d{2}|SL2\d{2}|GR9|GRVT|GD9|GDVT|GDVM|GM9|GMVC"
+    r"|AMVT|AMST|MBVB|HKT|HEH|TH\d")
+# condenser-ish wording for records whose model series is not in the table
+RE_EQ_COND_KW = re.compile(
+    r"condens|heat ?pump|package|mini.?split|air condition|split (air|system)"
+    r"|straight cool|\ba/?c\b|^cond-|^hp-", re.I)
+RE_EQ_SKU = re.compile(r"SKU\s*:?\s*([A-Z0-9/-]+)", re.I)
+# accessories only - crews often log just the t-stat on a full system
+# install, which says nothing about what equipment went in
+RE_EQ_ACCESSORY = re.compile(
+    r"t-?stat|thermostat|icomfort|ecobee|nuve|nest|honeywell|humidif|\buv\b"
+    r"|filter|filtration|air clean|purif|ionizer|reme|halo|apco|surge"
+    r"|heat (kit|strip)|media", re.I)
+
+# model-series prefixes -> display label, built from a 12-month survey of
+# installed-equipment records across all four tenants (2026-07-20).
+# Condenser/HP/package series only; anything matching here IS a condenser.
+# "{}" is replaced with the captured series. Furnaces (ML180UH/EL280UH/GR9S/
+# GRVT...), coils (CK40/CAPTA/CHPTA/LP4x...) and air handlers (CBK/AMVT...)
+# must NOT match - the capacity digit right after the series letters keeps
+# them out of the Lennox split pattern.
+COND_SERIES = [
+    # Lennox split AC/HP: ML14KC1, ML17KC2, EL18KCV, EL19KPV, SL25KCV,
+    # ML17XC1, ML14XP1 ... (K/X = coil type, C/P = cool/heat pump)
+    (r"(?:SL|EL|ML)\d{2}[KX][CP]\w?", "Lennox {}"),
+    (r"X[CP]\d{2}", "Lennox {}"),             # legacy XC16 / XP14
+    (r"1[3-6]ACX", "Lennox {}"),              # legacy 13ACX / 14ACX
+    (r"LRP\d{2}", "Lennox {} package"),       # LRP13GEK42, LRP15HPK48VP
+    # Goodman / Daikin-branded splits: GLXS4BA4210, GLXT7CA4810, GLZS5BA4810
+    (r"GL[XZ][ST]\d[A-Z]?", "Goodman {}"),
+    (r"AL[XZ][ST]\d[A-Z]?", "Amana {}"),          # Amana-badged twins
+    (r"GS[XZ](?:[A-Z]\d|\d{2})", "Goodman {}"),   # GSXH5036, GSX13/GSZ14
+    (r"G[XZ]V\d", "Goodman {}"),                  # side-discharge GXV6/GZV7
+    (r"GP[GHC][MC]?\d", "Goodman {} package"),    # GPGM5, GPHM3
+    (r"M4(?:PG|AC|HP)", "Ameristar {}"),
+    (r"R(?:NS|XS|XX)\d{2}", "Samsung mini split"),
+    (r"(?:FTX|RX)[A-Z]?\d{2}", "Daikin mini split"),
+    (r"M[UX]Z", "Mitsubishi mini split"),
+]
+COND_SERIES = [(re.compile(rx), lbl) for rx, lbl in COND_SERIES]
 
 
-def equip_cat(type_name):
-    for label, rx in EQUIP:
-        if rx.search(type_name or ""):
-            return label
-    return "Other"
+def _equip_model(rec):
+    """Best model string on an installed-equipment record (crews sometimes
+    put the model in name and leave model blank, or paste a catalog line
+    with 'SKU: XXX')."""
+    for raw in (rec.get("model"), rec.get("name")):
+        raw = (raw or "").strip()
+        if not raw:
+            continue
+        sku = RE_EQ_SKU.search(raw)
+        if sku:
+            return sku.group(1).upper().rstrip("(")
+        tok = raw.split()[0].upper()
+        if any(ch.isdigit() for ch in tok):
+            return tok
+    return ""
+
+
+def _series_label(model, mfr):
+    """Generic series for models not in COND_SERIES: first dash token, or
+    the model with the trailing capacity code stripped."""
+    m = re.sub(r"^(COND|AC|HP)-", "", model)
+    base = m.split("-")[0].split("/")[0]
+    if "-" not in m:
+        base = re.sub(r"\d{3,}[A-Z]{0,3}$", "", base) or base
+    if len(base) < 3:
+        return ""
+    mfr = (mfr or "").strip().title()
+    return f"{mfr} {base}".strip()
+
+
+def condenser_series(recs):
+    """Condenser series labels from a list of near-install equipment records
+    (deduped, sorted). Empty list = new equipment logged, none a condenser."""
+    out = set()
+    for rec in recs:
+        model = _equip_model(rec)
+        hit = None
+        for rx, lbl in COND_SERIES:
+            m = rx.match(model)
+            if m:
+                hit = lbl.format(m.group(0))
+                break
+        if hit is None and not RE_EQ_NOT_MODEL.match(model):
+            txt = " ".join(str(rec.get(k) or "") for k in
+                           ("name", "model", "manufacturer"))
+            if RE_EQ_COND_KW.search(txt) and not RE_EQ_NOT_COND.search(txt):
+                mfr = (rec.get("manufacturer") or "").strip().title()
+                # pricebook catalog lines carry no model, but the SEER2
+                # rating pins the Goodman series exactly
+                seer = re.search(r"(1[3-7]\.\d)\s*SEER2", txt)
+                fam = {"13.4": "S3B", "14.3": "S4B",
+                       "15.2": "S5B", "17.2": "T7C"}.get(
+                           seer.group(1)) if seer else None
+                if fam and mfr.startswith("Goodman"):
+                    hp = "Z" if re.search(r"heat ?pump", txt, re.I) else "X"
+                    hit = f"Goodman GL{hp}{fam}"
+                else:
+                    hit = (_series_label(model, mfr)
+                           or f"{mfr} (no model #)".strip())
+        if hit:
+            out.add(hit)
+    return sorted(out)
 
 
 # ---------------------------------------------------------------- fetch
@@ -319,7 +434,7 @@ def month_events(company, year, month, idx):
                 and classify(tname, bus.get(bu)) == "neutral"):
             rec = {"i": j["id"], "d": _day(j.get("completedOn")),
                    "loc": j.get("locationId"), "proj": j.get("projectId"),
-                   "t": round(float(j["total"]), 2), "eq": equip_cat(tname),
+                   "t": round(float(j["total"]), 2), "eq": None,
                    "tc": []}
             installs.append(rec)
             appt_of_inst[j["id"]] = [a for a in (j.get("firstAppointmentId"),
@@ -392,6 +507,7 @@ def month_events(company, year, month, idx):
 
     _fill_crews(tenant, installs, appt_of_inst)
     _fill_hours(tenant, callbacks, appt_of_cb)
+    _fill_equipment(tenant, installs)
     return {"installs": installs, "callbacks": callbacks,
             "qa": qa, "drywall": drywall}
 
@@ -416,6 +532,46 @@ def _fill_crews(tenant, installs, appt_of):
                 techs[rec["i"]].add(a["technicianId"])
     for rec in installs:
         rec["tc"] = sorted(techs[rec["i"]])
+
+
+def _fill_equipment(tenant, installs):
+    """installs[i]["eq"] = condenser series recorded at the location within
+    EQUIP_MATCH_DAYS of install completion. ["No condenser"] when the crew
+    logged equipment but none is a condenser (furnace/coil/duct jobs),
+    ["Not recorded"] when nothing was logged near the install date."""
+    by_loc = {}
+    for rec in installs:
+        by_loc.setdefault(rec["loc"], []).append(rec)
+    locs = sorted(by_loc)
+    near = {rec["i"]: [] for rec in installs}
+    for i in range(0, len(locs), 50):
+        batch = ",".join(str(l) for l in locs[i:i + 50])
+        for e in fetch_all(tenant,
+                           "/equipmentsystems/v2/tenant/{tenant}"
+                           "/installed-equipment",
+                           {"locationIds": batch}, page_size=200, max_pages=20):
+            io = (e.get("installedOn") or "")[:10]
+            if not io:
+                continue
+            try:
+                iod = _parse(io)
+            except ValueError:
+                continue
+            for rec in by_loc.get(e["locationId"], ()):
+                if abs((iod - _parse(rec["d"])).days) <= EQUIP_MATCH_DAYS:
+                    near[rec["i"]].append(e)
+    for rec in installs:
+        series = condenser_series(near[rec["i"]])
+        if not series:
+            # "No condenser" only when substantive gear (furnace/coil/...)
+            # was logged; a lone t-stat/IAQ record proves nothing
+            substantive = any(
+                not RE_EQ_ACCESSORY.search(" ".join(str(e.get(k) or "") for k
+                                           in ("name", "model",
+                                               "manufacturer")))
+                for e in near[rec["i"]])
+            series = ["No condenser"] if substantive else ["Not recorded"]
+        rec["eq"] = series
 
 
 def _fill_hours(tenant, callbacks, appt_of):
@@ -565,17 +721,23 @@ def aggregate(months, today):
                 first = min((x["gap"] for x in cbs), default=None)
                 if first is not None and first <= 180:
                     curve[first] += 1
-            eq = equip.setdefault(inst.get("eq") or "Other",
-                                  {"cat": inst.get("eq") or "Other",
-                                   "inst": 0, "n90": 0, "u90": 0,
-                                   "n180": 0, "u180": 0})
-            eq["inst"] += 1
-            if age > 90:
-                eq["n90"] += 1
-                eq["u90"] += any(x["gap"] <= 90 for x in cbs)
-            if age > 180:
-                eq["n180"] += 1
-                eq["u180"] += any(x["gap"] <= 180 for x in cbs)
+            # an install (and its callbacks) counts under EACH condenser
+            # series set on the job, so two-system homes inform both models
+            # (plumb_callback_board still stores eq as a single string)
+            cats = inst.get("eq")
+            if isinstance(cats, str):
+                cats = [cats]
+            for cat in cats or ["Not recorded"]:
+                eq = equip.setdefault(cat, {"cat": cat, "inst": 0,
+                                            "n90": 0, "u90": 0,
+                                            "n180": 0, "u180": 0})
+                eq["inst"] += 1
+                if age > 90:
+                    eq["n90"] += 1
+                    eq["u90"] += any(x["gap"] <= 90 for x in cbs)
+                if age > 180:
+                    eq["n180"] += 1
+                    eq["u180"] += any(x["gap"] <= 180 for x in cbs)
     for i in range(1, 181):
         curve[i] += curve[i - 1]      # cumulative
 
@@ -628,7 +790,9 @@ def aggregate(months, today):
     gaps_12mo.sort()
 
     equip_rows = sorted((e for e in equip.values() if e["inst"] >= 5),
-                        key=lambda e: -e["inst"])
+                        key=lambda e: (e["cat"] in ("No condenser",
+                                                    "Not recorded"),
+                                       -e["inst"]))
     return {
         "cohorts": cohort_rows,
         "monthly": monthly,
