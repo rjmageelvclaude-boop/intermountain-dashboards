@@ -7,11 +7,12 @@ One record per company per week (Mon-Sun, tenant-local; Week 1 is the deck's
 against the deck's Week-10 numbers (2026-07-05 snapshot):
 
   sales panel      estimates sold in the week (subtotal, Dismissed excluded),
-                   split by business-unit bucket (HVAC Sales / HVAC S&M /
-                   Plumbing service+maint), plus month-to-date through the
-                   week's Sunday - matched the deck's June close to the
-                   dollar - and the deck's weekday pace
-                   (mtd * weekdaysInMonth / weekdaysElapsed)
+                   split by the ESTIMATE's business-unit bucket (HVAC Sales /
+                   HVAC S&M / Plumbing service+maint) - the ST modular
+                   dashboard attributes sales to the estimate BU, not the
+                   parent job BU (Sierra 7/13-7/19: S&M $222,715 exact) -
+                   plus month-to-date through the week's Sunday and the
+                   deck's weekday pace (mtd * weekdaysInMonth / weekdaysElapsed)
   call center      inbound leadCalls deduped by leadCall id, rate =
                    Booked / (Booked+Unbooked+NotBooked); the ST rate excludes
                    AVOCA-answered calls, which get their own rate (note:
@@ -29,13 +30,28 @@ against the deck's Week-10 numbers (2026-07-05 snapshot):
                    Management Removed (W10: 166 vs deck 164); removed = the
                    ROPP+Removed overlap (33 vs deck 35). Also the deck's
                    "ROPPs vs plan" numerator and the silo TGL-rate denominator
-  HVAC S&M         completed HVAC-service-bucket jobs: opportunity /
-                   conversion via soldThreshold; avg ticket = week's S&M
-                   SALES / opps (the deck's exact W10 quotient); membership
+  HVAC S&M         completed HVAC-service-bucket jobs. hvacOppsRan (capacity)
+                   keeps the call-board opportunity rule. The panel's
+                   conversion matches the ST modular dashboard instead
+                   (DEFS_VER=5, validated vs ST 7/13-7/19): salesOpps =
+                   completed jobs excluding recall/warranty/callback/
+                   non-opportunity job types (name or class), conv = those
+                   jobs with > $0 sold (non-dismissed) estimates in the week;
+                   close = conv/salesOpps (ST 35%/34% vs ours 34.4%/34.1%),
+                   avg sale = SALES / conv (ST "Average Sale"). Membership
                    conversion = non-member jobs with a membership sold (SAM /
-                   Shield / MVP skus) over non-member OPPORTUNITY jobs
-  HVAC silo        TGLs = estimate-TGL-typed jobs created in the week, any
-                   generating tech, later-canceled included; same-day /
+                   Shield / MVP skus, OR a same-day membership record sold by
+                   a technician) over ALL non-member jobs - the ST Memberships
+                   tab denominator is every non-member job, not just
+                   opportunities (ST 61/318 & 14/78; ours 64/316 & 15/77)
+  HVAC silo        TGLs = estimate-typed jobs created in the week with a
+                   generating technician (jobGeneratedLeadSource), any
+                   department, later-canceled included - matches the ST Lead
+                   Generation tab and John's SILO weekly report (both count
+                   tech-generated estimate jobs; Sierra 7/13-7/19 they showed
+                   116 Monday morning, 122 by Monday evening as dispatchers
+                   back-fill lead sources). Also fixes the DEFS_VER=4 ULT
+                   undercount (ULT doesn't TGL-type reliably). Same-day /
                    next-day = first-appointment start vs creation day
   HVAC sales (CA)  completed HVAC-Sales-bucket jobs: Costco = the Costco BU
                    (regardless of job type), TGL = TGL-typed remainder,
@@ -70,6 +86,7 @@ resumable like the other boards.
 
 import datetime as dt
 import os
+import re
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -95,12 +112,16 @@ HISTORY_FILE = os.path.join(ROOT, "data", "wow-board-history.json")
 # Bump when metric definitions change: cached weeks computed under an older
 # version are recomputed instead of served (the Actions cache would otherwise
 # keep serving frozen weeks built with the old definitions forever).
-DEFS_VER = 4
+DEFS_VER = 5
 WEEK1_FROM = dt.date(2026, 5, 1)     # the deck's Week 1: Fri 5/1 - Sun 5/3
 WEEK1_TO = dt.date(2026, 5, 3)
 FREEZE_DAYS = 10                     # closed week is final this long after its Sunday
 RECHECK_HOURS = 24                   # until frozen, closed weeks refresh at most daily
 REMOVED_ROPP_TAGS = {"sierra": {545867780}}   # "Management Removed ROPP" (Sierra only)
+# Job types that never count as a sales opportunity on the ST modular
+# dashboard - matched against the job-type NAME and its (tenant-custom)
+# CLASS (Sierra: "Callback / Warranty", "Non-Opportunity").
+NON_OPP_TYPE = re.compile(r"recall|warranty|callback|non.?opp", re.I)
 
 COMPANIES = {
     "sierra":   {"tenant": "SIE", "tz": "pacific",  "label": "Sierra",   "color": "#1663c7"},
@@ -156,14 +177,28 @@ def build_ctx(company):
                           {"active": "Any"}, page_size=200)
                 if "avoca" in (e.get("name") or "").lower()}
 
-    with ThreadPoolExecutor(max_workers=4) as pool:
+    def tech_ids():
+        return {t["id"] for t in
+                fetch_all(tenant, "/settings/v2/tenant/{tenant}/technicians",
+                          {"active": "Any"}, page_size=200)}
+
+    def jt_classes():
+        # full pull (ULT has 300+ types - must paginate)
+        return {t["id"]: (t.get("class") or "") for t in
+                fetch_all(tenant, "/jpm/v2/tenant/{tenant}/job-types",
+                          {"active": "Any"}, page_size=200)}
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
         f_av = pool.submit(avoca_ids)
         f_thr = pool.submit(sold_thresholds, tenant)
         f_est = pool.submit(estimate_job_type_ids, tenant)
         f_jt = pool.submit(job_type_names, tenant)
+        f_tech = pool.submit(tech_ids)
+        f_cls = pool.submit(jt_classes)
         return {"avoca": f_av.result(),
                 "thresholds": f_thr.result(), "estTypes": f_est.result(),
-                "jtNames": f_jt.result()}
+                "jtNames": f_jt.result(), "techIds": f_tech.result(),
+                "jtClass": f_cls.result()}
 
 
 # ---------------------------------------------------------------- week core
@@ -188,7 +223,7 @@ def compute_week(company, day_from, day_to, ctx):
     # ---- all API pulls, concurrently (fetch_all already fans out pages)
     jobs_path = "/jpm/v2/tenant/{tenant}/jobs"
     est_path = "/sales/v2/tenant/{tenant}/estimates"
-    with ThreadPoolExecutor(max_workers=7) as pool:
+    with ThreadPoolExecutor(max_workers=8) as pool:
         f_done = pool.submit(fetch_all, tenant, jobs_path,
                              {"completedOnOrAfter": start, "completedBefore": end,
                               "jobStatus": "Completed"}, 500, 200)
@@ -203,12 +238,16 @@ def compute_week(company, day_from, day_to, ctx):
                                 {"createdOnOrAfter": start, "createdBefore": end}, 500, 200)
         f_calls = pool.submit(fetch_all, tenant, "/telecom/v2/tenant/{tenant}/calls",
                               {"createdOnOrAfter": start, "createdBefore": end}, 500, 400)
+        f_memb = pool.submit(fetch_all, tenant,
+                             "/memberships/v2/tenant/{tenant}/memberships",
+                             {"createdOnOrAfter": start, "createdBefore": end}, 200, 50)
         jobs_done = f_done.result()
         est_sold_all = f_sold.result()
         est_mtd = f_mtd.result()
         appt_jobs = f_appt.result()
         jobs_created = f_created.result()
         calls = f_calls.result()
+        memb_created = f_memb.result()
 
     not_dismissed = lambda e: ((e.get("status") or {}).get("name") or "") != "Dismissed"
     est_sold = [e for e in est_sold_all if not_dismissed(e)]
@@ -224,7 +263,10 @@ def compute_week(company, day_from, day_to, ctx):
     m["monthClosed"] = day_to >= m_last
     m["totSales"] = round(sum(float(e.get("subtotal") or 0) for e in est_sold), 2)
 
-    # department split of the week's sold estimates (bucket via parent job)
+    # department split of the week's sold estimates by the ESTIMATE's own
+    # business unit - how the ST modular dashboard attributes sales (a
+    # service tech's estimate keeps the service BU even when the parent job
+    # sits elsewhere). Sierra 7/13-7/19: S&M matched ST to the dollar.
     jobs_by_id = {j["id"]: j for j in jobs_done}
     for j in appt_jobs:
         jobs_by_id.setdefault(j["id"], j)
@@ -240,7 +282,7 @@ def compute_week(company, day_from, day_to, ctx):
         if e.get("jobId"):
             sold_on_job.setdefault(e["jobId"], []).append(e)
         amt = float(e.get("subtotal") or 0)
-        b = bucket(jobs_by_id.get(e.get("jobId")) or {})
+        b = bu.get(e.get("businessUnitId"))
         if b == "hvac_sales":
             dept["sales"] += amt
         elif b in HVAC_SERVICE:
@@ -373,28 +415,57 @@ def compute_week(company, day_from, day_to, ctx):
              costcoRan=ca_ran["costco"], costcoClosed=ca_closed["costco"],
              mktRan=ca_ran["mkt"], mktClosed=ca_closed["mkt"])
 
-    # Membership conversion, validated against RJ's report (Sierra W10:
-    # S&M 44/217 = 20%, plumbing 7/45 = 15%): memberships sold on ANY
-    # previously-non-member job in the family (maintenance visits usually
-    # price below the sold threshold, so the sales mostly happen on non-opp
-    # jobs) over previously-non-member OPPORTUNITY jobs.
+    # ST-modular-dashboard sales panel (DEFS_VER=5): salesOpps = the family's
+    # completed jobs excluding recall/warranty/callback/non-opportunity job
+    # types; conv = those jobs with > $0 sold (non-dismissed) estimates this
+    # week. conv/salesOpps tracked the ST Sales tab's close rate within a
+    # point on both families (Sierra 7/13-7/19: 34.4% vs 35%, 34.1% vs 34%).
+    def st_sales(key):
+        opps = conv = 0
+        for j, _ in fam_jobs[key]:
+            jt = j.get("jobTypeId")
+            if NON_OPP_TYPE.search(jt_names.get(jt) or "") \
+                    or NON_OPP_TYPE.search(ctx["jtClass"].get(jt) or ""):
+                continue
+            opps += 1
+            conv += sum(float(e.get("subtotal") or 0)
+                        for e in sold_on_job.get(j["id"], ())) > 0
+        return opps, conv
+
+    m["smSalesOpps"], m["smConv"] = st_sales("sm")
+    m["plSalesOpps"], m["plConv"] = st_sales("pl")
+
+    # Membership conversion, matched to the ST Memberships tab (DEFS_VER=5,
+    # Sierra 7/13-7/19: ST 61/318 S&M, 14/78 plumbing; ours 64/316, 15/77):
+    # denominator = EVERY previously-non-member completed job in the family
+    # (not just opportunities); numerator = those jobs with a membership sku
+    # on a sold estimate OR a membership record created the same tenant-local
+    # day for the job's customer and sold by a technician (techs sometimes
+    # ring the membership through the invoice with no estimate line).
     customers = fam["sm"]["cust"] | fam["pl"]["cust"]
     memberships = _memberships_for_customers(tenant, customers) if customers else {}
+    memb_days = {}
+    for mb in memb_created:
+        if mb.get("soldById") in ctx["techIds"] and mb.get("customerId") \
+                and mb.get("createdOn"):
+            memb_days.setdefault(mb["customerId"], set()).add(
+                _local_completed_day(tz, mb["createdOn"]).isoformat())
 
     def memb_metrics(key, sku_match):
-        nm_opps = nm_sold = 0
+        nm_jobs = nm_sold = 0
         for j, opp in fam_jobs[key]:
             if not j.get("customerId"):
                 continue
             day = _local_completed_day(tz, j["completedOn"]).isoformat()
             if _member_before(memberships, j["customerId"], day):
                 continue
-            nm_opps += opp
+            nm_jobs += 1
             nm_sold += any(
                 sku_match((it.get("sku") or {}).get("name"))
                 for e in sold_on_job.get(j["id"], ())
-                for it in (e.get("items") or []))
-        return nm_opps, nm_sold
+                for it in (e.get("items") or [])) \
+                or day in memb_days.get(j["customerId"], ())
+        return nm_jobs, nm_sold
 
     m["smNmJobs"], m["smNmSold"] = memb_metrics("sm", lambda n: hvac_memb_sku(company, n))
     m["plNmJobs"], m["plNmSold"] = memb_metrics("pl", lambda n: plumb_memb_sku(company, n))
@@ -403,7 +474,6 @@ def compute_week(company, day_from, day_to, ctx):
         f = fam[key]
         m[prefix + "Jobs"] = f["jobs"]
         m[prefix + "Opps"] = f["opps"]
-        m[prefix + "Conv"] = f["conv"]
         m[prefix + "Revenue"] = round(f["rev"], 2)
 
     # plumbing units: WH/filtration skus on sold estimates tied to plumbing jobs
@@ -422,14 +492,18 @@ def compute_week(company, day_from, day_to, ctx):
              plFiltration=units["filtration"])
 
     # ---------------------------------------------------------- HVAC silo
-    # TGL = every estimate-TGL-typed job created in the week, any generating
-    # tech, INCLUDING later-canceled (a created lead is a created lead, and
-    # the count then never drifts after the week closes). Sierra W10: 84 vs
-    # RJ's 81 - his snapshot predates a few cancel-status flips.
+    # TGL = every estimate-typed job created in the week with a generating
+    # technician (jobGeneratedLeadSource), INCLUDING later-canceled. This is
+    # the ST Lead Generation tab's rule and John's SILO weekly report
+    # ("dept-wide" - service techs' turnovers count, not just the silo team),
+    # and it no longer depends on dispatchers typing the job "... TGL"
+    # (fixes the ULT undercount flagged at DEFS_VER=4). Counts drift a few
+    # jobs for ~a day after the week closes as dispatchers back-fill lead
+    # sources on last week's jobs.
     tgl_jobs = []
     for j in jobs_created:
-        name = (jt_names.get(j.get("jobTypeId")) or "").lower()
-        if j.get("jobTypeId") in ctx["estTypes"] and "tgl" in name:
+        if j.get("jobTypeId") in ctx["estTypes"] \
+                and (j.get("jobGeneratedLeadSource") or {}).get("employeeId"):
             tgl_jobs.append(j)
     appt_start = {}
     appt_ids = sorted({j.get("firstAppointmentId") for j in tgl_jobs

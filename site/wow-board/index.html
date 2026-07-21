@@ -186,8 +186,8 @@ function metricList(co, weeks) {
     {id:"roppPlan", lbl:"Ropps vs Plan", sec:"CAPACITY", up:1, ...cap("ropps", w => w.m.roppsRan)},
     {id:"roppsRemoved", lbl:"Removed Ropps", sec:"CAPACITY", up:0, hide:w => w.m.roppsRemoved === 0 && co.key !== "sierra", val:w => w.m.roppsRemoved, fmt:v => v.toFixed(0), d:dnum},
     {id:"smSales", lbl:"S&M Sales", sec:"HVAC S&M", up:1, val:w => w.m.smSales, fmt:fmtM, d:dpct},
-    {id:"smConv", lbl:"S&M Conversion", sec:"HVAC S&M", up:1, val:w => w.m.smOpps ? w.m.smConv / w.m.smOpps * 100 : 0, fmt:v => v.toFixed(0) + "%", d:pp},
-    {id:"smTicket", lbl:"S&M Avg Ticket", sec:"HVAC S&M", up:1, val:w => w.m.smOpps ? w.m.smSales / w.m.smOpps : 0, fmt:fmt$, d:(a,b) => dnum(a,b).replace(/^([+−])/, "$1$")},
+    {id:"smConv", lbl:"S&M Close Rate", sec:"HVAC S&M", up:1, val:w => w.m.smSalesOpps ? w.m.smConv / w.m.smSalesOpps * 100 : 0, fmt:v => v.toFixed(0) + "%", d:pp},
+    {id:"smTicket", lbl:"S&M Avg Sale", sec:"HVAC S&M", up:1, val:w => w.m.smConv ? w.m.smSales / w.m.smConv : 0, fmt:fmt$, d:(a,b) => dnum(a,b).replace(/^([+−])/, "$1$")},
     {id:"smMemb", lbl:"Membership Conv. (S&M)", sec:"HVAC S&M", up:1, val:w => w.m.smNmJobs ? w.m.smNmSold / w.m.smNmJobs * 100 : 0, fmt:v => v.toFixed(0) + "%", d:pp},
     {id:"tglRate", lbl:"TGL Rate", sec:"HVAC SILO", up:1, val:w => w.m.roppsRan ? w.m.siloTgls / w.m.roppsRan * 100 : 0, fmt:v => v.toFixed(0) + "%", d:pp},
     {id:"tgls", lbl:"TGLs Generated", sec:"HVAC SILO", up:1, val:w => w.m.siloTgls, fmt:v => v.toFixed(0), d:dnum},
@@ -199,8 +199,8 @@ function metricList(co, weeks) {
     {id:"mktConv", lbl:"Marketed Conversion", sec:"HVAC SALES", up:1, val:w => w.m.mktRan ? w.m.mktClosed / w.m.mktRan * 100 : 0, fmt:v => v.toFixed(0) + "%", d:pp},
     {id:"cancEst", lbl:"Canceled Estimates", sec:"HVAC SALES", up:0, val:w => w.m.cancSales, fmt:v => v.toFixed(0), d:dnum},
     {id:"plSales", lbl:"Plumbing Sales", sec:"PLUMBING", up:1, plumb:1, val:w => w.m.plSales, fmt:fmtM, d:dpct},
-    {id:"plConv", lbl:"Plumbing Conversion", sec:"PLUMBING", up:1, plumb:1, val:w => w.m.plOpps ? w.m.plConv / w.m.plOpps * 100 : 0, fmt:v => v.toFixed(0) + "%", d:pp},
-    {id:"plTicket", lbl:"Plumbing Avg Ticket", sec:"PLUMBING", up:1, plumb:1, val:w => w.m.plOpps ? w.m.plSales / w.m.plOpps : 0, fmt:fmt$, d:dpct},
+    {id:"plConv", lbl:"Plumbing Close Rate", sec:"PLUMBING", up:1, plumb:1, val:w => w.m.plSalesOpps ? w.m.plConv / w.m.plSalesOpps * 100 : 0, fmt:v => v.toFixed(0) + "%", d:pp},
+    {id:"plTicket", lbl:"Plumbing Avg Sale", sec:"PLUMBING", up:1, plumb:1, val:w => w.m.plConv ? w.m.plSales / w.m.plConv : 0, fmt:fmt$, d:dpct},
     {id:"plMemb", lbl:"Membership Conv. (Plumb)", sec:"PLUMBING", up:1, plumb:1, val:w => w.m.plNmJobs ? w.m.plNmSold / w.m.plNmJobs * 100 : 0, fmt:v => v.toFixed(0) + "%", d:pp},
   ];
   return M.filter(x => (!x.plumb || co.plumb) && (!x.costco || co.costco));
