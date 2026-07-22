@@ -78,6 +78,17 @@ body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:#f6f8fb;min-
 @keyframes flashRedCell{0%,100%{background:rgba(239,68,68,.12)}50%{background:rgba(239,68,68,.6)}}
 @keyframes cancelFlash{0%,100%{background:#dc2626}50%{background:#7f1d1d}}
 .cb-num{min-width:22px;height:22px;border-radius:50%;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.can-click{cursor:pointer}
+.can-click .metric-row{cursor:pointer}
+.can-click:hover .metric-row{background:rgba(220,38,38,.05)}
+.can-drop{background:#fafbfd;border-bottom:1px solid #f1f5f9;padding:2px 0 4px}
+.can-drop-row{display:flex;align-items:center;gap:8px;padding:4px 14px 4px 30px;font-size:12px;color:#475569}
+.cd-num{min-width:18px;height:18px;border-radius:50%;background:#cbd5e1;color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.cd-job{flex:1;font-weight:600;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cd-time{font-weight:700;font-variant-numeric:tabular-nums;color:#dc2626;white-space:nowrap}
+.can-drop-note{padding:4px 14px 2px 30px;font-size:10px;color:#94a3b8}
+.can-caret{display:inline-block;width:12px;color:#94a3b8;font-size:10px;transition:transform .15s}
+.can-caret.open{transform:rotate(90deg)}
 .header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px 16px;margin-bottom:20px;flex-wrap:wrap}
 .header-actions{text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
 .tab-strip{display:flex;gap:6px;margin-top:16px}
@@ -553,6 +564,36 @@ function mrow(label,val,f,bgt,key,cls){
   return'<div class="metric-row'+(cls?" "+cls:"")+'" style="background:'+bg+'">'+dotH+'<div class="m-label">'+label+'</div><div class="m-val">'+fmt(val,f)+'</div>'+pctH+'<div class="m-spark3">'+(key?trend3(key):"")+'</div><div class="m-spark28">'+(key?wowTrend(key,f):"")+'</div></div>';
 }
 
+// ── Canceled-call drill-downs: each canceled row toggles its own dropdown of
+// the individual canceled jobs (job # + cancel time, in order of cancelation).
+var cancelOpen={}; // open dropdowns keyed company:listKey - survives re-renders/refreshes
+function toggleCancelList(id){cancelOpen[id]=!cancelOpen[id];render()}
+function fmtCancelTime(s){ // engine sends tenant-local "YYYY-MM-DDTHH:MM"; prefix M/D when it isn't the viewed day
+  if(!s)return"—";
+  var p=s.split("T"),hm=p[1].split(":"),h=+hm[0],ap=h>=12?"PM":"AM";h=h%12||12;
+  var day=viewDate||toYMD(new Date()),dp=p[0].split("-");
+  return(p[0]===day?"":(+dp[1])+"/"+(+dp[2])+" ")+h+":"+hm[1]+" "+ap;
+}
+function canrow(label,cntKey,listKey){
+  var n=g(cntKey),id=act+":"+listKey,open=n>0&&!!cancelOpen[id];
+  var caret=n>0?'<span class="can-caret'+(open?" open":"")+'">▶</span> ':'<span class="can-caret"></span> ';
+  var row=mrow(caret+label,n,"#",undefined,cntKey);
+  var html=n>0?'<div class="can-click" onclick="toggleCancelList(\''+id+'\')" title="Click to show each canceled call">'+row+'</div>':row;
+  if(!open)return html;
+  var list=((viewDate?getHistoricalData():sd[act])||{})[listKey];
+  html+='<div class="can-drop">';
+  if(list&&list.length){
+    list.slice().sort(function(a,b){var x=a.canceledAt||"",y=b.canceledAt||"";return x<y?-1:x>y?1:0})
+      .forEach(function(r,i){
+        html+='<div class="can-drop-row"><span class="cd-num">'+(i+1)+'</span><span class="cd-job">#'+r.jobNumber+(r.type?' · '+r.type:'')+'</span><span class="cd-time">'+fmtCancelTime(r.canceledAt)+'</span></div>';
+      });
+    html+='<div class="can-drop-note">In order of cancelation · tenant-local time</div>';
+  }else{
+    html+='<div class="can-drop-row" style="color:#94a3b8">Job detail isn\'t cached for this day yet — it arrives with the next data refresh</div>';
+  }
+  return html+'</div>';
+}
+
 function hero(label,val,f,bgt,sub,hasRing,compare){
   var co=CO[act],p=bgt&&bgt>0?val/bgt*100:null;
   var sc=p!==null?(p>=100?"#16a34a":p>=80?"#eab308":"#ef4444"):"#94a3b8";
@@ -752,21 +793,18 @@ function render(){
   ccB+=divd("Phones")+mrow("Inbound Calls",g("callsInbound"),"#",undefined,"callsInbound")+mrow("Inbound Leads",g("inboundLeads"),"#",undefined,"inboundLeads")+mrow("Inbound Booking Rate",g("bookingRate"),"%",undefined,"bookingRate");
   // Memberships sold with no job on today's board - office/phone sales
   // (job-tied memberships stay in their trade sections)
-  ccB+=divd("Memberships Sold — Office")+mrow("HVAC",g("hvacOfficeMembershipsSold"),"#",undefined,"hvacOfficeMembershipsSold");
-  if(co.plumb){ccB+=mrow("Plumbing",g("plumbOfficeMembershipsSold"),"#",undefined,"plumbOfficeMembershipsSold")}
-  if(co.elec){ccB+=mrow("Electrical",g("elecOfficeMembershipsSold"),"#",undefined,"elecOfficeMembershipsSold")}
-  ccB+=mrow("Total",g("officeMembershipsSold"),"#",undefined,"officeMembershipsSold");
+  ccB+=divd("Memberships Sold — Office")+mrow("Memberships",g("officeMembershipsSold"),"#",undefined,"officeMembershipsSold");
   ccB+=divd("ROPPs")+mrow("ROPP Budget",roppBgt,"#",undefined,null)+mrow("ROPPs on Board",g("hvacRoppsOnBoard"),"#",roppBgt,"hvacRoppsOnBoard");
 
   // Turnover-model companies (Brothers): the tgl* keys carry turnovers -
   // sales-BU jobs created after a service/maintenance visit at the location.
   var tglN=co.turnover?"Turnovers":"TGLs";
-  var tB=mrow("ROPPs on Board",g("hvacRoppsOnBoard"),"#",roppBgt,"hvacRoppsOnBoard")+mrow("ROPPs Ran",g("hvacRoppsRan"),"#",undefined,"hvacRoppsRan")+mrow(tglN+" Set",g("tglsSet"),"#",undefined,"tglsSet")+mrow(tglN+" Set Same Day",g("tglsSetSameDay"),"#",undefined,"tglsSetSameDay")+mrow(tglN+" Canceled",g("tglsCanceled"),"#",undefined,"tglsCanceled")+mrow("Flip Rate",flipRate,"%",undefined,null,flipLow?"flash-red":"");
+  var tB=mrow("ROPPs on Board",g("hvacRoppsOnBoard"),"#",roppBgt,"hvacRoppsOnBoard")+mrow("ROPPs Ran",g("hvacRoppsRan"),"#",undefined,"hvacRoppsRan")+mrow(tglN+" Set",g("tglsSet"),"#",undefined,"tglsSet")+mrow(tglN+" Set Same Day",g("tglsSetSameDay"),"#",undefined,"tglsSetSameDay")+canrow(tglN+" Canceled","tglsCanceled","tglsCanceledJobs")+mrow("Flip Rate",flipRate,"%",undefined,null,flipLow?"flash-red":"");
 
-  var canB=mrow("HVAC Service & Maintenance",g("hvacSMCanceled"),"#",undefined,"hvacSMCanceled")+mrow("HVAC Sales",g("hvacSalesCanceled"),"#",undefined,"hvacSalesCanceled");
-  if(co.plumb){canB+=mrow("Plumbing",g("plumbCanceled"),"#",undefined,"plumbCanceled")}
-  if(co.elec){canB+=mrow("Electrical",g("elecCanceled"),"#",undefined,"elecCanceled")}
-  if(co.excav){canB+=mrow("Excavation",g("excavCanceled"),"#",undefined,"excavCanceled")}
+  var canB=canrow("HVAC Service & Maintenance","hvacSMCanceled","hvacSMCanceledJobs")+canrow("HVAC Sales","hvacSalesCanceled","hvacSalesCanceledJobs");
+  if(co.plumb){canB+=canrow("Plumbing","plumbCanceled","plumbCanceledJobs")}
+  if(co.elec){canB+=canrow("Electrical","elecCanceled","elecCanceledJobs")}
+  if(co.excav){canB+=canrow("Excavation","excavCanceled","excavCanceledJobs")}
 
   var hB=mrow("Maintenance on Board",g("hvacMaintenanceOnBoard"),"#",undefined,"hvacMaintenanceOnBoard")+mrow("Maintenance Ran",g("hvacMaintenanceRan"),"#",undefined,"hvacMaintenanceRan")+mrow("Demand on Board",g("hvacDemandOnBoard"),"#",undefined,"hvacDemandOnBoard")+mrow("Demand Ran",g("hvacDemandRan"),"#",undefined,"hvacDemandRan")+mrow("Total Revenue",g("hvacServiceRevenue"),"$",undefined,"hvacServiceRevenue")+mrow("Total Sales",g("hvacServiceSales"),"$",undefined,"hvacServiceSales")+mrow("Average Ticket",hvacAvg,"$",undefined,null)+mrow("Options per Opp",g("hvacOptionsPerOpp"),"x",undefined,"hvacOptionsPerOpp")+mrow("Memberships Sold",g("hvacMembershipsSold"),"#",undefined,"hvacMembershipsSold")+mrow("Membership Conversion",g("hvacMembConversion"),"%",undefined,"hvacMembConversion")+mrow("Membership Offer Rate",g("hvacMembOfferRate"),"%",undefined,"hvacMembOfferRate");
 
@@ -865,7 +903,7 @@ function render(){
       co.short+" · Flip rate "+flipRate.toFixed(1)+"% — "+g("tglsSet")+" "+(co.turnover?"turnovers":"TGLs")+" set on "+g("hvacRoppsRan")+" ROPPs ran",null,"clearFlipAlarm()");
   }
   if(cancelAlarm){
-    var jobLines=(cancelJobs||[]).map(function(r){return"#"+r.jobNumber+" · "+r.type}).join("<br>");
+    var jobLines=(cancelJobs||[]).map(function(r){return"#"+r.jobNumber+" · "+r.type+(r.canceledAt?" · "+fmtCancelTime(r.canceledAt):"")}).join("<br>");
     overlays+=bigAlert(false,"FIND OUT WHY WE JUST THREW AWAY $10,000+!!!!!","CANCELED ESTIMATE!!!!",
       co.short+" · "+cancelCount+" canceled HVAC sales call"+(cancelCount===1?"":"s")+" today",jobLines,"clearCancelAlarm()");
   }

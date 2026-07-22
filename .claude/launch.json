@@ -14,6 +14,12 @@
       "port": 8891
     },
     {
+      "name": "hyperion-site-audit",
+      "runtimeExecutable": "py",
+      "runtimeArgs": ["-m", "http.server", "8894", "--directory", "site"],
+      "port": 8894
+    },
+    {
       "name": "command-center",
       "runtimeExecutable": "py",
       "runtimeArgs": ["build/command_center_server.py"],

@@ -466,15 +466,30 @@ def compute_day(company, day, jt_names=None):
     m["elecInstallsOnBoard"] = count(lambda j: live(j) and inst(j, "elec_install"))
     m["elecInstallsCompleted"] = count(lambda j: ran(j) and inst(j, "elec_install"))
 
-    m["hvacSMCanceled"] = count(lambda j: j["_bucket"] in HVAC_SERVICE and j.get("jobStatus") == "Canceled")
-    m["hvacSalesCanceled"] = count(lambda j: j["_bucket"] == "hvac_sales" and j.get("jobStatus") == "Canceled")
-    # job list feeds the canceled-estimate alarm overlay (job numbers only - data.json is public)
-    m["hvacSalesCanceledJobs"] = [
-        {"jobNumber": str(j.get("jobNumber") or j["id"]), "type": j["_jt_name"]}
-        for j in board if j["_bucket"] == "hvac_sales" and j.get("jobStatus") == "Canceled"]
-    m["plumbCanceled"] = count(lambda j: (j["_bucket"] or "").startswith("plumb") and j.get("jobStatus") == "Canceled")
-    m["elecCanceled"] = count(lambda j: (j["_bucket"] or "").startswith("elec") and j.get("jobStatus") == "Canceled")
-    m["excavCanceled"] = count(lambda j: j["_bucket"] in EXCAV_ALL and j.get("jobStatus") == "Canceled")
+    # Canceled-call drill-downs: per-section job lists in cancel order, feeding
+    # the clickable dropdowns and the canceled-estimate alarm overlay. For a
+    # Canceled job ServiceTitan stores the cancel timestamp in completedOn
+    # (verified against /jobs/{id}/canceled-log - 40/40 jobs across all four
+    # tenants, 2026-07-20), so the board pull already has it. Job number/type/
+    # time only - no customer data (data.json is public).
+    def canceled_rows(pred):
+        rows = [{"jobNumber": str(j.get("jobNumber") or j["id"]),
+                 "type": j["_jt_name"],
+                 "canceledAt": _local_dt_str(j.get("completedOn"), co["tz"])}
+                for j in board if j.get("jobStatus") == "Canceled" and pred(j)]
+        rows.sort(key=lambda r: r["canceledAt"] or "")
+        return rows
+
+    m["hvacSMCanceledJobs"] = canceled_rows(lambda j: j["_bucket"] in HVAC_SERVICE)
+    m["hvacSMCanceled"] = len(m["hvacSMCanceledJobs"])
+    m["hvacSalesCanceledJobs"] = canceled_rows(lambda j: j["_bucket"] == "hvac_sales")
+    m["hvacSalesCanceled"] = len(m["hvacSalesCanceledJobs"])
+    m["plumbCanceledJobs"] = canceled_rows(lambda j: (j["_bucket"] or "").startswith("plumb"))
+    m["plumbCanceled"] = len(m["plumbCanceledJobs"])
+    m["elecCanceledJobs"] = canceled_rows(lambda j: (j["_bucket"] or "").startswith("elec"))
+    m["elecCanceled"] = len(m["elecCanceledJobs"])
+    m["excavCanceledJobs"] = canceled_rows(lambda j: j["_bucket"] in EXCAV_ALL)
+    m["excavCanceled"] = len(m["excavCanceledJobs"])
 
     # -- jobs created today (feeds TGLs/turnovers and same-day installs)
     created = [decorate(j) for j in fetch_all(
@@ -533,7 +548,13 @@ def compute_day(company, day, jt_names=None):
         tgl_created = [j for j in tgl_candidates if _source_done(j)]
     m["tglsSet"] = len(tgl_created)
     m["tglsSetSameDay"] = sum(1 for j in tgl_created if j["id"] in jobs_by_id)
-    m["tglsCanceled"] = sum(1 for j in tgl_created if j.get("jobStatus") == "Canceled")
+    m["tglsCanceledJobs"] = sorted(
+        [{"jobNumber": str(j.get("jobNumber") or j["id"]),
+          "type": j["_jt_name"],
+          "canceledAt": _local_dt_str(j.get("completedOn"), co["tz"])}
+         for j in tgl_created if j.get("jobStatus") == "Canceled"],
+        key=lambda r: r["canceledAt"] or "")
+    m["tglsCanceled"] = len(m["tglsCanceledJobs"])
 
     # -- estimates sold today
     estimates = fetch_all(tenant, "/sales/v2/tenant/{tenant}/estimates",
@@ -570,8 +591,8 @@ def compute_day(company, day, jt_names=None):
         lambda j: live(j) and inst(j, "plumb_install") and same_day(j))
     m["elecInstallsSameDay"] = count(
         lambda j: live(j) and inst(j, "elec_install") and same_day(j))
-    m["sameDayDef"] = 7  # history recompute marker - v7: membership conversion
-    # / options-per-opp on the completed-jobs basis too (2026-07-16)
+    m["sameDayDef"] = 8  # history recompute marker - v8: canceled-call job
+    # lists with cancel times for the dropdown drill-downs (2026-07-20)
 
     # an estimate can be sold today on an older sales job that never touched
     # today's board - classify those turnover-or-marketed too
@@ -1027,15 +1048,16 @@ def compute_history(progress=None):
     """Past-day metrics per company (weekends included), cached on disk
     (past days never change).
 
-    Entries missing sameDayDef=7 predate the current metric definitions (v2:
+    Entries missing sameDayDef=8 predate the current metric definitions (v2:
     sold-today same-day installs; v3: memberships sold from the memberships
     endpoint with the office/non-job split; v4: ROPP excludes Management
     Removed ROPP - all 2026-07-15; v5: TGL set requires the generating job
     to be Completed, same day; v6: daily revenue = invoices of jobs COMPLETED
     that local day, matching the ST dashboard's Completed Revenue; v7:
     membership conversion / options-per-opp also on the completed-jobs basis
-    instead of the appointment board - both 2026-07-16)
-    and are recomputed once so the sparklines don't mix definitions.
+    instead of the appointment board - both 2026-07-16; v8: canceled-call job
+    lists with cancel times so the drill-down dropdowns work on past days -
+    2026-07-20) and are recomputed once so the sparklines don't mix definitions.
     """
     cache = _load_json(HISTORY_FILE, {})
     out = {}
