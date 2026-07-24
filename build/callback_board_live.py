@@ -74,7 +74,7 @@ from command_center_live import (fetch_all, local_today, _load_json,
 from tech_board_live import month_window_utc
 
 HISTORY_FILE = os.path.join(ROOT, "data", "callback-board-history.json")
-CACHE_V = 8                  # bump when classification/schema changes
+CACHE_V = 9                  # bump when classification/schema changes
 WINDOW_CLOSED_MONTHS = 18    # cohort months kept besides the current month
 MONTH_FREEZE_DAYS = 40       # month is final this long after month-end
 MONTH_RECHECK_HOURS = 24     # until frozen, closed months refresh at most daily
@@ -432,7 +432,8 @@ def month_events(company, year, month, idx):
         tname = jt.get(j.get("jobTypeId"))
         if (j.get("businessUnitId") == bu and float(j.get("total") or 0) > 0
                 and classify(tname, bus.get(bu)) == "neutral"):
-            rec = {"i": j["id"], "d": _day(j.get("completedOn")),
+            rec = {"i": j["id"], "jn": str(j.get("jobNumber") or j["id"]),
+                   "d": _day(j.get("completedOn")),
                    "loc": j.get("locationId"), "proj": j.get("projectId"),
                    "t": round(float(j["total"]), 2), "eq": None,
                    "tc": []}
@@ -497,9 +498,10 @@ def month_events(company, year, month, idx):
                 continue
             bucket, src = "recall", "service"  # problem with our install
 
-        cb = {"i": j["id"], "b": bucket, "s": src, "ty": tname or "?", "d": d,
+        cb = {"i": j["id"], "jn": str(j.get("jobNumber") or j["id"]),
+              "b": bucket, "s": src, "ty": tname or "?", "d": d,
               "rsn": reason(tname, j.get("summary"), cat),
-              "oi": orig["i"], "om": orig["d"][:7],
+              "oi": orig["i"], "om": orig["d"][:7], "ojn": orig.get("jn"),
               "gap": max(0, (_parse(d) - _parse(orig["d"])).days), "hrs": 0}
         callbacks.append(cb)
         appt_of_cb[j["id"]] = [a for a in (j.get("firstAppointmentId"),
@@ -783,7 +785,7 @@ def aggregate(months, today):
                 if g is not None:
                     gaps_12mo.append(g)
                 reasons[x["rsn"]] = reasons.get(x["rsn"], 0) + 1
-            recent.append({"date": x["d"], "type": x["ty"],
+            recent.append({"date": x["d"], "jn": x.get("jn"), "type": x["ty"],
                            "cat": x.get("s") or x["b"],
                            "rsn": x["rsn"], "gap": g, "om": x.get("om")})
     recent.sort(key=lambda r: r["date"] or "", reverse=True)
@@ -840,6 +842,21 @@ def crew_rows(months, names, today, label):
                      "rate90f": round(s["cb90f"] / s["inst"] * 100, 1),
                      "per100": round(s["visits"] / s["inst"] * 100)})
     rows.sort(key=lambda r: (-r["rate90"], -r["inst"]))
+    return rows
+
+
+def validation_rows(months):
+    """Every counted callback in the window, newest first - the raw rows
+    behind the board's numbers, for auditing against ServiceTitan."""
+    rows = []
+    for ev in months.values():
+        for x in ev["callbacks"]:
+            rows.append({"date": x["d"], "jn": x.get("jn"),
+                         "type": x["ty"], "cat": x.get("s") or x["b"],
+                         "b": x["b"], "rsn": x["rsn"], "gap": x.get("gap"),
+                         "om": x.get("om"), "ojn": x.get("ojn"),
+                         "hrs": x.get("hrs")})
+    rows.sort(key=lambda r: r["date"] or "", reverse=True)
     return rows
 
 
@@ -935,6 +952,9 @@ def compute(time_budget_secs=None, progress=None):
         boards[company] = dict(
             agg, kpis=_kpis(agg, open_cb, today),
             crew=crew_rows(months, names, today, COMPANIES[company]["label"]))
+
+    # data-validation tab: every counted Sierra callback, with job numbers
+    boards["sierra"]["validation"] = validation_rows(month_sets["sierra"])
 
     combined = aggregate(_merge_months(month_sets), today)
     combined["recent"] = sorted(

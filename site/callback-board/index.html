@@ -64,6 +64,8 @@ td.cur{background:#fbfceb}
 .ptable{margin-top:10px;overflow-y:auto;max-height:300px}
 .ptable table{font-size:11px}
 .ptable th{position:sticky;top:0;background:#fff}
+.vtable{margin-top:10px;overflow:auto;max-height:75vh}
+.vtable th{position:sticky;top:0;background:#fff;z-index:1}
 
 .footer{margin-top:4px;font-size:11px;font-weight:600;color:#999;line-height:1.6}
 .footer b{color:#777}
@@ -95,7 +97,7 @@ td.cur{background:#fbfceb}
     </div>
   </div>
   <div class="topbar">
-    <div class="big-title">INSTALL CALLBACKS<small id="t-sub">HVAC INSTALL · COMBINED</small></div>
+    <div class="big-title">INSTALL CALLBACKS<small id="t-sub">HVAC INSTALL · SIERRA</small></div>
     <div class="tabs" id="tabs"></div>
   </div>
   <div id="board"><div class="empty">Waiting for data…</div></div>
@@ -105,7 +107,9 @@ td.cur{background:#fbfceb}
 "use strict";
 const RELOAD_MINS = 5;
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-let DATA = null, cur = "combined";
+// hidden for now (RJ 2026-07-24): combined + all companies except Sierra
+const HIDDEN_TABS = ["combined","ultimate","russett","brothers"];
+let DATA = null, cur = "sierra";
 
 const $ = id => document.getElementById(id);
 const pctc = v => v <= 10 ? "cell-good" : v <= 25 ? "cell-mid" : "cell-bad";
@@ -379,9 +383,10 @@ function recentHtml(b) {
     <div class="t-title">Recent callback visits</div>
     <div class="t-sub">latest ${rows.length} completed return trips tied to our installs</div>
     <div class="tscroll"><table>
-      <tr><th class="l">Completed</th>${cur==="combined"?'<th class="l">Company</th>':""}<th class="l">Job type</th><th class="l">Category</th><th class="l">Reason</th><th>Days after install</th><th>Install month</th></tr>
+      <tr><th class="l">Completed</th><th class="l">Job #</th>${cur==="combined"?'<th class="l">Company</th>':""}<th class="l">Job type</th><th class="l">Category</th><th class="l">Reason</th><th>Days after install</th><th>Install month</th></tr>
       ${rows.map(r => `<tr>
         <td class="l">${r.date || "—"}</td>
+        <td class="l">${r.jn ? "#" + r.jn : "—"}</td>
         ${cur==="combined"?`<td class="l">${r.co || ""}</td>`:""}
         <td class="l">${r.type}</td>
         <td class="l"><span class="chip ${r.cat}">${r.cat}</span></td>
@@ -392,8 +397,43 @@ function recentHtml(b) {
   </div>`;
 }
 
+/* data-validation tab: every counted Sierra callback with job numbers */
+function validationHtml() {
+  const rows = (DATA.boards.sierra || {}).validation;
+  if (!rows) return `<div class="tablecard">
+    <div class="t-title">Data validation — Sierra</div>
+    <div class="empty">Waiting for the next data refresh — job numbers aren't in data.json yet.</div>
+  </div>`;
+  const n = c => rows.filter(r => r.cat === c).length;
+  return `<div class="tablecard">
+    <div class="t-title">Data validation — Sierra</div>
+    <div class="t-sub">every return trip currently counted on this board — ${rows.length} rows:
+      ${n("recall")} recall/warranty · ${n("finish")} finish · ${n("service")} service returns ·
+      newest first · check any row against ServiceTitan by job number</div>
+    <div class="vtable"><table>
+      <tr><th class="l">Completed</th><th class="l">Job #</th><th class="l">Job type</th><th class="l">Category</th><th class="l">Bucket</th><th class="l">Reason</th><th>Days after install</th><th>Install month</th><th class="l">Install job #</th><th>Hrs</th></tr>
+      ${rows.map(r => `<tr>
+        <td class="l">${r.date || "—"}</td>
+        <td class="l">${r.jn ? "#" + r.jn : "—"}</td>
+        <td class="l">${r.type}</td>
+        <td class="l"><span class="chip ${r.cat}">${r.cat}</span></td>
+        <td class="l">${r.b === "finish" ? "Finish" : "Recall/Warr"}</td>
+        <td class="l">${r.rsn || ""}</td>
+        <td>${r.gap != null ? r.gap : "—"}</td>
+        <td>${r.om ? mLabel(r.om) : "—"}</td>
+        <td class="l">${r.ojn ? "#" + r.ojn : "—"}</td>
+        <td>${r.hrs != null ? r.hrs : "—"}</td></tr>`).join("")}
+    </table></div>
+  </div>`;
+}
+
 function render() {
   if (!DATA) return;
+  if (cur === "validation") {
+    $("t-sub").textContent = "HVAC INSTALL · SIERRA · DATA VALIDATION";
+    $("board").innerHTML = validationHtml();
+    return;
+  }
   const b = DATA.boards[cur];
   const label = cur === "combined" ? "COMBINED" : DATA.companies[cur].label.toUpperCase();
   $("t-sub").textContent = "HVAC INSTALL · " + label;
@@ -419,7 +459,10 @@ function render() {
 }
 
 function tabsHtml() {
-  const t = [["combined","Combined"], ...Object.entries(DATA.companies).map(([k,c]) => [k, c.label])];
+  const t = Object.entries(DATA.companies)
+    .filter(([k]) => !HIDDEN_TABS.includes(k))
+    .map(([k,c]) => [k, c.label]);
+  t.push(["validation","Data Validation"]);
   $("tabs").innerHTML = t.map(([k,l]) =>
     `<div class="tab ${k===cur?"on":""}" onclick="pick('${k}')">${l}</div>`).join("");
 }
