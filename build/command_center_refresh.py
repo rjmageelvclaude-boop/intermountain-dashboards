@@ -22,6 +22,7 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 
 import command_center_live as engine
+import command_center_weather as weather
 
 OUT = os.path.join(ROOT, "site", "command-center", "data.json")
 
@@ -32,9 +33,15 @@ def main():
     history = engine.compute_history(progress=lambda co, d: print(f"  {co} {d}"))
     print("Pulling today's live numbers...")
     current = engine.compute_current()
+    try:
+        wx = weather.get_weather()  # cached 3h; never worth failing the refresh over
+    except Exception as e:
+        print(f"Weather fetch failed (footer will hide): {e}")
+        wx = {}
     payload = {
         "current": current,
         "history": history,
+        "weather": wx,
         "generatedAt": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
     os.makedirs(os.path.dirname(OUT), exist_ok=True)

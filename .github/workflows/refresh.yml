@@ -115,6 +115,10 @@ jobs:
         continue-on-error: true
         env:
           ST_SECRETS_JSON: ${{ secrets.ST_SECRETS_JSON }}
+          # Command Center weather footer: AccuWeather when the key is set,
+          # Open-Meteo (no key) otherwise. Cached 3h in data/ - the free
+          # AccuWeather tier (50 calls/day) survives the 10-min cron.
+          ACCUWEATHER_API_KEY: ${{ secrets.ACCUWEATHER_API_KEY }}
           ST_TIMEOUT: "120"
           ST_PAGE_CONCURRENCY: "4"   # concurrent pages per list fetch
           # In-flight cap per board process. Boards also thread their three

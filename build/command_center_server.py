@@ -30,6 +30,7 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 
 import command_center_live as engine
+import command_center_weather as weather
 
 DASHBOARD_HTML = os.path.join(ROOT, "command-center-live", "index.html")
 CACHE_TTL_MIN = 10
@@ -41,7 +42,12 @@ _cache = {"payload": None, "fetched_at": 0.0, "refreshing": False}
 def _build_payload():
     current = engine.compute_current()
     history = engine.read_history()  # whatever the backfill thread has cached so far
-    return {"current": current, "history": history}
+    try:
+        wx = weather.get_weather()  # cached 3h; never worth failing the feed over
+    except Exception as e:
+        print(f"Weather fetch failed (footer will hide): {e}", file=sys.stderr)
+        wx = {}
+    return {"current": current, "history": history, "weather": wx}
 
 
 def get_payload(force=False):

@@ -109,6 +109,21 @@ body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:#f6f8fb;min-
 .trend-table th:first-child,.trend-table td:first-child{text-align:left}
 .trend-table td{text-align:right;padding:4px 10px;border-bottom:1px solid #f1f5f9;font-variant-numeric:tabular-nums;color:#334155}
 .trend-table tr.total td{font-weight:800;color:#0f172a;border-top:2px solid #e2e8f0}
+.wx-footer{background:linear-gradient(135deg,#0f172a 0%,#1e293b 50%,#0f172a 100%);padding:16px 24px 14px;margin-top:8px}
+.wx-inner{max-width:1140px;margin:0 auto}
+.wx-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;gap:12px;flex-wrap:wrap}
+.wx-city{font-size:12px;font-weight:800;color:#fff;text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:8px}
+.wx-bar{width:4px;height:16px;border-radius:2px;background:var(--co);display:inline-block}
+.wx-src{font-size:10px;color:#64748b;font-weight:600}
+.wx-days{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.wx-day{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 8px;text-align:center}
+.wx-day.today{background:rgba(255,255,255,.13);border-color:var(--co)}
+.wx-dow{font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em}
+.wx-emoji{font-size:26px;line-height:1.3;margin:4px 0 2px}
+.wx-phrase{font-size:10px;color:#94a3b8;font-weight:600;min-height:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wx-temps{font-size:14px;font-weight:800;color:#fff;margin-top:4px;font-variant-numeric:tabular-nums}
+.wx-temps .lo{color:#64748b;font-weight:700;font-size:12px}
+.wx-precip{font-size:10px;color:#38bdf8;font-weight:700;margin-top:2px;min-height:13px}
 @media(max-width:900px){
   .two-col{grid-template-columns:1fr}
   .hero-grid{grid-template-columns:repeat(2,1fr)}
@@ -136,6 +151,12 @@ body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:#f6f8fb;min-
   .m-label{font-size:12px}
   .m-val{width:76px;font-size:13px}
   .m-pct{width:38px}
+  .wx-footer{padding:12px 10px 10px}
+  .wx-days{gap:6px}
+  .wx-day{padding:8px 4px}
+  .wx-emoji{font-size:20px}
+  .wx-phrase{display:none}
+  .wx-temps{font-size:12px}
 }
 @media(max-width:430px){
   .m-spark28{display:none}
@@ -166,7 +187,7 @@ const CO={
 
 const now=new Date();
 const hr=now.getHours(),greet=hr<12?"Good morning":hr<17?"Good afternoon":"Good evening";
-let act="sierra",sd={},hist={};
+let act="sierra",sd={},hist={},wx={};
 for(var k0 in CO){sd[k0]={};hist[k0]=[]}
 let budgets=JSON.parse(localStorage.getItem("pcc-b7")||"{}"),sOpen=false,lp=null;
 let tab="today"; // "today" = the live board, "trends" = MTD revenue trend charts
@@ -605,11 +626,36 @@ function sec(t,icon,color,lg,summary,body){
   return'<div class="section"><div class="section-header" style="background:'+lg+'"><div class="section-bar" style="background:'+color+'"></div><span style="font-size:13px">'+icon+'</span><span class="section-title">'+t+'</span>'+(summary?'<span class="section-summary" style="color:'+color+'">'+summary+'</span>':'')+'</div><div style="padding:4px 4px 8px">'+body+'</div></div>';
 }
 
+// ── 5-day weather footer: each company board shows its home city (Sierra =
+// Las Vegas, Russett = Tucson, Ultimate = Boise, Brothers = Denver). The
+// forecast rides in data.json ("weather"), pulled server-side from
+// AccuWeather (Open-Meteo fallback when no API key is configured).
+function wxFooter(){
+  var w=wx[act];
+  if(!w||!w.days||!w.days.length)return"";
+  var today=toYMD(new Date());
+  var cards=w.days.map(function(d){
+    return'<div class="wx-day'+(d.date===today?" today":"")+'" title="'+d.dow+" · "+d.phrase+'">'
+      +'<div class="wx-dow">'+(d.date===today?"Today":d.dow)+'</div>'
+      +'<div class="wx-emoji">'+d.emoji+'</div>'
+      +'<div class="wx-phrase">'+d.phrase+'</div>'
+      +'<div class="wx-temps">'+Math.round(d.hi)+'° <span class="lo">/ '+Math.round(d.lo)+'°</span></div>'
+      +'<div class="wx-precip">'+(d.precip>0?"💧 "+d.precip+"%":"")+'</div></div>';
+  }).join("");
+  var upd="";
+  if(w.updatedAt){try{upd=" · updated "+new Date(w.updatedAt).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}catch(e){}}
+  return'<div class="wx-footer"><div class="wx-inner"><div class="wx-head">'
+    +'<span class="wx-city"><span class="wx-bar"></span>'+w.city+' · 5-Day Forecast</span>'
+    +'<span class="wx-src">'+(w.source||"")+upd+'</span></div>'
+    +'<div class="wx-days">'+cards+'</div></div></div>';
+}
+
 var feedError=null,feedSource=null;
 function applyFeed(j){
   if(j.current){sd=j.current}else{sd=j}
   for(var k in CO){sd[k]=sd[k]||{}}
   if(j.history){hist=j.history;for(var k2 in CO){hist[k2]=hist[k2]||[]}}
+  if(j.weather)wx=j.weather;
 }
 async function fetchData(force){
   var url=DATA_URL+((IS_LOCAL||IS_FILE)&&force?"?refresh=1":"");
@@ -949,6 +995,7 @@ function render(){
     '<div class="company-bar" style="background:'+co.grad+'"><div class="company-bar-inner"><span>'+co.name+'</span><span>'+bd+' budgeted days ('+totalWeekdays+' weekdays'+(nbdCount>0?' minus '+nbdCount+' off':'')+')</span></div></div>'+
     '<div class="budget-panel'+(sOpen?" open":"")+'"><div class="budget-panel-inner"><div style="font-size:12px;font-weight:700;color:#1e293b;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Monthly Budgets & Overrides — '+co.short+'</div><div style="font-size:11px;margin-bottom:14px;color:'+(budgetsSynced?"#16a34a":"#ca8a04")+'">'+(budgetsSynced?"● Shared budgets — changes here update every viewer":"● Local to this device — shared budget server not connected")+'</div><div class="budget-grid">'+bHtml+'</div></div></div>'+
     (tab==="trends"?renderTrends():todayMain)+
+    wxFooter()+
     (pinkBlink?'<div class="code-pink-overlay"></div>':'')+
     overlays;
   attachChartHover();

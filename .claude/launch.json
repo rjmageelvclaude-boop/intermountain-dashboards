@@ -24,6 +24,12 @@
       "runtimeExecutable": "C:\\Users\\magee\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
       "runtimeArgs": ["build/command_center_server.py"],
       "port": 8778
+    },
+    {
+      "name": "command-center-alt",
+      "runtimeExecutable": "C:\\Users\\magee\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+      "runtimeArgs": ["build/command_center_server.py", "--port", "8779"],
+      "port": 8779
     }
   ]
 }
